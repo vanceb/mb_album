@@ -1,5 +1,7 @@
 import argparse
 import musicbrainzngs
+import json
+import os
 
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
@@ -10,8 +12,33 @@ import urllib.parse
 
 from spotify_secret import get_spotify_credentials
 
+TOKEN_FILE = 'spotify_token.json'
+
+def save_token_info(token_info):
+    """
+    Save the token information to a file.
+    
+    :param token_info: The token information to save
+    """
+    with open(TOKEN_FILE, 'w') as file:
+        json.dump(token_info, file)
+
+def load_token_info():
+    """
+    Load the token information from a file.
+    
+    :return: The token information if it exists, otherwise None
+    """
+    if os.path.exists(TOKEN_FILE):
+        with open(TOKEN_FILE, 'r') as file:
+            return json.load(file)
+    return None
+
 class AuthHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
+        """
+        Handle GET requests to capture the Spotify authorization code.
+        """
         # Parse the query parameters
         query = urllib.parse.urlparse(self.path).query
         params = dict(urllib.parse.parse_qsl(query))
@@ -37,13 +64,23 @@ class AuthHandler(http.server.SimpleHTTPRequestHandler):
 
 def get_spotify_token(client_id, client_secret, redirect_uri):   
     """
-    Perform Spotify OAuth 2.0 Authorization Code Flow
+    Perform Spotify OAuth 2.0 Authorization Code Flow to get an access token.
     
     :param client_id: Spotify Developer application client ID
     :param client_secret: Spotify Developer application client secret
     :param redirect_uri: Registered redirect URI for the application
     :return: Authenticated Spotify client
+    :raises ValueError: If authorization fails
     """
+    token_info = load_token_info()
+    
+    if token_info:
+        sp_oauth = SpotifyOAuth(client_id=client_id, client_secret=client_secret, redirect_uri=redirect_uri)
+        if sp_oauth.is_token_expired(token_info):
+            token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
+            save_token_info(token_info)
+        return spotipy.Spotify(auth=token_info['access_token'])
+    
     # Create a local server to handle the redirect
     with socketserver.TCPServer(('localhost', 8888), AuthHandler) as httpd:
         # Set up OAuth manager
@@ -74,11 +111,18 @@ def get_spotify_token(client_id, client_secret, redirect_uri):
         # Exchange authorization code for access token
         if httpd.auth_code and 'error' not in httpd.auth_code:
             token_info = sp_oauth.get_access_token(httpd.auth_code)
+            save_token_info(token_info)
             return spotipy.Spotify(auth=token_info['access_token'])
         else:
             raise ValueError("Authorization failed")
 
 def lookup_album_by_barcode(barcode):
+    """
+    Look up an album by its barcode using the MusicBrainz API.
+    
+    :param barcode: The barcode of the album to look up
+    :return: Tuple containing album title and artist name, or (None, None) if not found
+    """
     print(f"Looking up album by barcode: {barcode}")
     musicbrainzngs.set_useragent("Album_Lookup", "1.0", "vance@axxe.co.uk")
     
@@ -98,6 +142,14 @@ def lookup_album_by_barcode(barcode):
         return None, f"Error: {e}"
 
 def search_album_on_spotify(sp, album_name, artist_name):
+    """
+    Search for an album on Spotify by album name and artist name.
+    
+    :param sp: Authenticated Spotify client
+    :param album_name: Name of the album to search for
+    :param artist_name: Name of the artist of the album
+    :return: Tuple containing album ID, album name, and artist name, or (None, None, None) if not found
+    """
     print(f"Searching for album on Spotify: {album_name} by {artist_name}")
     query = f"album:{album_name} artist:{artist_name}"
     result = sp.search(q=query, type='album', limit=1)
@@ -111,18 +163,30 @@ def search_album_on_spotify(sp, album_name, artist_name):
         return None, None, None
 
 def add_album_to_spotify(sp, album_id):
+    """
+    Add an album to the user's Spotify 'My Music' library.
+    
+    :param sp: Authenticated Spotify client
+    :param album_id: Spotify ID of the album to add
+    :return: Success message or error message
+    """
     print(f"Adding album to Spotify 'My Music': {album_id}")
-
 
     try:
         sp.current_user_saved_albums_add([album_id])
-        print("Album added to 'My Music' on Spotify.")
         return "Album added to 'My Music' on Spotify."
     except spotipy.SpotifyException as e:
         print(f"Error adding album to Spotify: {e}")
         return f"Error: {e}"
 
 def lookup_and_add_album(sp, barcode):
+    """
+    Look up an album by its barcode and add it to the user's Spotify 'My Music' library.
+    
+    :param sp: Authenticated Spotify client
+    :param barcode: The barcode of the album to look up
+    :return: Result message indicating success or failure
+    """
     print(f"Starting lookup and add process for barcode: {barcode}")
     album_name, artist_name = lookup_album_by_barcode(barcode)
     if not album_name or not artist_name:
@@ -135,11 +199,13 @@ def lookup_and_add_album(sp, barcode):
         return "Album not found on Spotify."
 
 def main():
+    """
+    Main function to parse arguments and initiate the album lookup and add process.
+    """
     print("Starting the program.")
     parser = argparse.ArgumentParser(description="Look up an album by its barcode and add it to Spotify 'My Music'.")
     parser.add_argument('barcode', type=str, help='The barcode of the CD to look up')
     args = parser.parse_args()
-
 
     # Wait for the authentication code to be set
     credentials = get_spotify_credentials()
@@ -150,7 +216,6 @@ def main():
     print("Spotify authentication completed.")
     result = lookup_and_add_album(sp, args.barcode)
     print(result)
-
 
 if __name__ == "__main__":
     main()

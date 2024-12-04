@@ -5,3 +5,4 @@ __pycache__
 .cache
 
 *secret.py
+spotify_token.json
