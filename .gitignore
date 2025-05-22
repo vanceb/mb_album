@@ -6,3 +6,7 @@ __pycache__
 
 *secret.py
 spotify_token.json
+
+*.yaml
+*.yml
+*.csv

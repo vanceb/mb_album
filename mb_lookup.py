@@ -2,6 +2,7 @@ import argparse
 import musicbrainzngs
 import json
 import os
+import csv
 
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
@@ -198,6 +199,56 @@ def lookup_and_add_album(sp, barcode):
     else:
         return "Album not found on Spotify."
 
+def lookup_and_append_to_csv(barcode, filename):
+    """
+    Perform the lookup from barcode to MusicBrainz album and artist, then use the MusicBrainz album and artist
+    to lookup a Spotify album. Append the following CSV fields to the file: barcode, MusicBrainz artist, 
+    MusicBrainz album, Spotify album ID, Spotify artist, Spotify album.
+    
+    :param barcode: The barcode of the album to look up
+    :param filename: The name of the CSV file to append the results to
+    """
+    # Perform MusicBrainz lookup
+    musicbrainzngs.set_useragent("Album_Lookup", "1.0", "vance@axxe.co.uk")
+    try:
+        result = musicbrainzngs.search_releases(barcode=barcode)
+        if result['release-list']:
+            release = result['release-list'][0]
+            mb_album = release['title']
+            mb_artist = release['artist-credit'][0]['artist']['name']
+            print(f"Found album on MusicBrainz: {mb_album} by {mb_artist}")
+        else:
+            print("No album found for this barcode on MusicBrainz.")
+            return
+    except musicbrainzngs.WebServiceError as e:
+        print(f"Error looking up album on MusicBrainz: {e}")
+        return
+
+    # Perform Spotify lookup
+    credentials = get_spotify_credentials()
+    client_id = credentials['client_id']
+    client_secret = credentials['client_secret']
+    sp = get_spotify_token(client_id, client_secret, "http://localhost:8888/callback")
+    
+    query = f"album:{mb_album} artist:{mb_artist}"
+    result = sp.search(q=query, type='album', limit=1)
+    
+    if result['albums']['items']:
+        album = result['albums']['items'][0]
+        spotify_album_id = album['id']
+        spotify_album = album['name']
+        spotify_artist = album['artists'][0]['name']
+        print(f"Found album on Spotify: {spotify_album} by {spotify_artist}")
+    else:
+        print("Album not found on Spotify.")
+        return
+
+    # Append results to CSV file
+    with open(filename, 'a', newline='') as csvfile:
+        csvwriter = csv.writer(csvfile)
+        csvwriter.writerow([barcode, mb_artist, mb_album, spotify_album_id, spotify_artist, spotify_album])
+        print(f"Appended results to {filename}")
+
 def main():
     """
     Main function to parse arguments and initiate the album lookup and add process.
@@ -214,7 +265,8 @@ def main():
     print("Waiting for Spotify authentication...")
     sp = get_spotify_token(client_id, client_secret, "http://localhost:8888/callback")
     print("Spotify authentication completed.")
-    result = lookup_and_add_album(sp, args.barcode)
+    result = lookup_and_append_to_csv(args.barcode, 'albums.csv')
+#    result = lookup_and_add_album(sp, args.barcode)
     print(result)
 
 if __name__ == "__main__":

@@ -1,0 +1,30 @@
+[
+    {
+        "header": "Barcode",
+        "path": "release.barcode"
+    },
+    {
+        "header": "MusicBrainz ID",
+        "path": "release.id"
+    },
+    {
+        "header": "Release Date",
+        "path": "release.date"
+    },
+    {
+        "header": "Country",
+        "path": "release.country"
+    },
+    {
+        "header": "Album/Release",
+        "path": "release.title"
+    },
+    {
+        "header": "Artist",
+        "path": "release.artist-credit.0.artist.name"
+    },
+    {
+        "header": "First Release",
+        "path": "full_release.release-group.first-release-date"
+    }
+]
