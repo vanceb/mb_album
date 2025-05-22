@@ -10,3 +10,5 @@ spotify_token.json
 *.yaml
 *.yml
 *.csv
+
+README.html
