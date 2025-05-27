@@ -1,2 +1,3 @@
 #!/bin/sh
-echo "VERSION = \"$(git rev-parse --short HEAD)\"" > version.py
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+echo "VERSION = \"$(git rev-parse --short HEAD)\"" > "$SCRIPT_DIR/version.py"
