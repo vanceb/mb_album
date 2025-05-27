@@ -254,6 +254,7 @@ def get_track_names(mbid):
         print(f"MusicBrainz API error: {e}")
         return
 
+
 def scan_barcodes(input_file, output_file, coverart_folder):
     # Load existing barcodes from the input file
     existing_barcodes = set()
