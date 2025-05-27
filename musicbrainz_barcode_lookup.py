@@ -4,12 +4,20 @@ import csv
 import os
 import argparse
 import yaml
+import requests
 from collections import defaultdict
+from version import VERSION
+
+# Create a user agent from the repo and version.
+REPO_NAME = "musicbrainz-barcode-lookup"
+CONTACT = "vance@axxe.co.uk"
+USER_AGENT = f"{REPO_NAME}/{VERSION} ({CONTACT})"
+
+musicbrainzngs.set_useragent(REPO_NAME, VERSION, CONTACT)
 
 class MusicBrainzBarcodeLookup:
-    def __init__(self, app_name="BarcodeLookupApp", version="1.0", contact="user@example.com"):
-        musicbrainzngs.set_useragent(app_name, version, contact)
-
+    def __init__(self):
+        pass
     def lookup_by_barcode(self, barcode):
         """
         Look up a release by barcode using the MusicBrainz API.
@@ -67,7 +75,7 @@ class MusicBrainzBarcodeLookup:
         print(f"Album/Release: {title}")
         print(f"Artist: {artist}")
         print(f"First Release: {first_release}")
-        print("-" * 40)
+
 
 def extract_json_path(data, path):
     """Extract value from nested dict/list using dot-separated path."""
@@ -208,12 +216,84 @@ def csv_to_year_artist_hierarchy(csv_file, yaml_file):
 
     print(f"YAML hierarchy by year written to {yaml_file}")
 
+def download_cover_art(mbid, barcode, folder="coverart"):
+    """
+    Download the front cover art for a release MBID and save it as <barcode>.jpg in the specified folder.
+    """
+    url = f"https://coverartarchive.org/release/{mbid}/front"
+    os.makedirs(folder, exist_ok=True)
+    dest_path = os.path.join(folder, f"{barcode}.jpg")
+    try:
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            with open(dest_path, "wb") as f:
+                f.write(response.content)
+            print(f"Downloaded cover art to {dest_path}")
+        else:
+            print(f"No cover art found for MBID {mbid} (HTTP {response.status_code})")
+    except Exception as e:
+        print(f"Error downloading cover art for MBID {mbid}: {e}")
+
+def get_track_names(mbid):
+    """
+    Given a MusicBrainz release MBID, return a list of track names for that release.
+    """
+    try:
+        # Request the release with recordings included
+        result = musicbrainzngs.get_release_by_id(mbid, includes=["recordings"])
+        tracks = []
+        # The tracks are nested in 'medium-list' > 'track-list'
+        mediums = result['release'].get('medium-list', [])
+        for medium in mediums:
+            for track in medium.get('track-list', []):
+                title = track.get('recording', {}).get('title')
+                if title:
+                    tracks.append(title)
+        return tracks
+    except musicbrainzngs.WebServiceError as e:
+        print(f"MusicBrainz API error: {e}")
+        return
+
+def scan_barcodes(input_file, output_file, coverart_folder):
+    # Load existing barcodes from the input file
+    existing_barcodes = set()
+    if os.path.exists(input_file):
+        with open(input_file, newline='', encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                barcode = row.get("Barcode")
+                if barcode:
+                    existing_barcodes.add(barcode)
+    lookup = MusicBrainzBarcodeLookup()
+    print("Enter barcodes (Ctrl+C to exit):")
+    try:
+        while True:
+            barcode = input("> ").strip()
+            if not barcode:
+                continue
+            if barcode in existing_barcodes:
+                print(f"Barcode {barcode} already exists in catalog. Skipping.")
+                continue
+            release = lookup.lookup_by_barcode(barcode)
+            lookup.print_release_info(release)
+            write_release_to_csv(release, output_file, existing_barcodes)
+            # Download cover art if possible
+            if release and "release" in release:
+                mbid = release["release"].get("id")
+                if mbid:
+                    download_cover_art(mbid, barcode, folder=coverart_folder)
+            # Add to set to prevent duplicates in this session
+            existing_barcodes.add(barcode)
+            print("-" * 40)
+    except KeyboardInterrupt:
+        print("\nExiting.")
+
 def main():
     parser = argparse.ArgumentParser(description="MusicBrainz Barcode Lookup Utility")
     parser.add_argument(
         "mode",
-        choices=["scan", "byartist", "byyear"],
-        help="Mode: scan barcodes, export YAML by artist, or export YAML by year"
+        choices=["scan", "byartist", "byyear", "tracks"],
+        help="Mode: scan barcodes, export YAML by artist, export YAML by year, or list tracks for a release"
     )
     parser.add_argument(
         "--input",
@@ -223,6 +303,15 @@ def main():
     parser.add_argument(
         "--output",
         help="Output file (optional, defaults to byartist.yaml or byyear.yaml depending on mode)"
+    )
+    parser.add_argument(
+        "--coverart",
+        help="Folder to save downloaded cover art (default: coverart)",
+        default="coverart"
+    )
+    parser.add_argument(
+        "--mbid",
+        help="MusicBrainz release MBID (required for tracks mode)"
     )
     args = parser.parse_args()
 
@@ -234,32 +323,37 @@ def main():
 
     if args.mode == "scan":
         output_file = args.output if args.output else args.input  # default to catalog.csv
-        # Load existing barcodes from the input file
-        existing_barcodes = set()
-        if os.path.exists(args.input):
-            with open(args.input, newline='', encoding="utf-8") as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    barcode = row.get("Barcode")
-                    if barcode:
-                        existing_barcodes.add(barcode)
-        lookup = MusicBrainzBarcodeLookup()
-        print("Enter barcodes (Ctrl+C to exit):")
+        scan_barcodes(args.input, output_file, args.coverart)
+    elif args.mode == "tracks":
+        if not args.mbid:
+            print("You must provide --mbid for tracks mode.")
+            return
         try:
-            while True:
-                barcode = input("> ").strip()
-                if not barcode:
-                    continue
-                if barcode in existing_barcodes:
-                    print(f"Barcode {barcode} already exists in catalog. Skipping.")
-                    continue
-                release = lookup.lookup_by_barcode(barcode)
-                lookup.print_release_info(release)
-                write_release_to_csv(release, output_file, existing_barcodes)
-                # Add to set to prevent duplicates in this session
-                existing_barcodes.add(barcode)
-        except KeyboardInterrupt:
-            print("\nExiting.")
+            # Fetch release info to get artist and album
+            release_info = musicbrainzngs.get_release_by_id(args.mbid, includes=["artists"])
+            release = release_info["release"]
+            album = release.get("title", "Unknown Album")
+            # Extract artist name(s)
+            artist = "Unknown Artist"
+            artist_credit = release.get("artist-credit")
+            if artist_credit and isinstance(artist_credit, list):
+                names = []
+                for credit in artist_credit:
+                    if isinstance(credit, dict) and "artist" in credit:
+                        names.append(credit["artist"].get("name", ""))
+                    elif isinstance(credit, str):
+                        names.append(credit)
+                artist = " & ".join([n for n in names if n])
+            print(f"{artist} - {album}")
+        except Exception as e:
+            print(f"Error fetching release info: {e}")
+        tracks = get_track_names(args.mbid)
+        if tracks:
+            print("Track list:")
+            for idx, track in enumerate(tracks, 1):
+                print(f"{idx}. {track}")
+        else:
+            print("No tracks found or error retrieving tracks.")
     else:
         # For all other modes, input is required (default is catalog.csv)
         output_file = args.output if args.output else default_outputs[args.mode]
