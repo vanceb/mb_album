@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}{{ album.Artist }} - {{ album['Album/Release'] }}{% endblock %}
+
+{% block header %}{{ album.Artist }} - {{ album['Album/Release'] }}{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 1rem;">
+    <a href="{{ url_for('catalog') }}">&larr; Back to Catalog</a>
+</div>
+
+<div style="display: flex; gap: 2rem; align-items: flex-start;">
+    <!-- Cover Art -->
+    <div style="flex-shrink: 0;">
+        {% set cover_path = 'coverart/' + album.Barcode + '.jpg' %}
+        <img src="{{ url_for('static', filename=cover_path) }}" 
+             alt="Album cover" 
+             style="width: 300px; height: 300px; object-fit: cover; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.2);"
+             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+        <div style="display: none; width: 300px; height: 300px; background-color: #f0f0f0; border: 2px dashed #ccc; border-radius: 8px; align-items: center; justify-content: center; color: #666;">
+            No Cover Art
+        </div>
+    </div>
+    
+    <!-- Album Details -->
+    <div style="flex-grow: 1;">
+        <h2>{{ album['Album/Release'] or 'Unknown Album' }}</h2>
+        <h3 style="color: #666; margin-top: 0;">by {{ album.Artist or 'Unknown Artist' }}</h3>
+        
+        <div style="margin: 2rem 0;">
+            <table class="table" style="max-width: 600px;">
+                <tr>
+                    <td><strong>First Release:</strong></td>
+                    <td>{{ album['First Release'] or 'Unknown' }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Release Date:</strong></td>
+                    <td>{{ album['Release Date'] or 'Unknown' }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Country:</strong></td>
+                    <td>{{ album.Country or 'Unknown' }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Barcode:</strong></td>
+                    <td><code>{{ album.Barcode or 'No barcode' }}</code></td>
+                </tr>
+                <tr>
+                    <td><strong>MusicBrainz ID:</strong></td>
+                    <td>
+                        {% if album['MusicBrainz ID'] %}
+                        <a href="https://musicbrainz.org/release/{{ album['MusicBrainz ID'] }}" target="_blank">
+                            {{ album['MusicBrainz ID'] }}
+                        </a>
+                        {% else %}
+                        Unknown
+                        {% endif %}
+                    </td>
+                </tr>
+            </table>
+        </div>
+        
+        <!-- Track Listing -->
+        {% if tracks %}
+        <h3>Track Listing</h3>
+        <ol style="background-color: #f8f9fa; padding: 1rem; border-radius: 4px;">
+            {% for track in tracks %}
+            <li style="margin: 0.5rem 0;">{{ track }}</li>
+            {% endfor %}
+        </ol>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

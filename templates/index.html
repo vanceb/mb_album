@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block title %}Barcode Scanner{% endblock %}
+
+{% block header %}Barcode Scanner{% endblock %}
+
+{% block content %}
+<h2>Barcode Scanner</h2>
+<p>Enter barcodes below. Each barcode will be automatically looked up and added to the catalog.</p>
+
+<div id="scanner-area">
+    <input type="text" id="barcode-input" placeholder="Scan or type barcode here" autofocus>
+    <button onclick="processBarcode()">Lookup</button>
+</div>
+
+<div id="status" style="margin-top: 1rem;"></div>
+
+<div id="recent-scans" style="margin-top: 2rem;">
+    <h3>Recent Scans</h3>
+    <div id="scan-results"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let isProcessing = false;
+
+document.getElementById('barcode-input').addEventListener('keydown', function(event) {
+    if (event.key === 'Enter' && !isProcessing) {
+        processBarcode();
+    }
+});
+
+async function processBarcode() {
+    const input = document.getElementById('barcode-input');
+    const barcode = input.value.trim();
+    
+    if (!barcode) {
+        showStatus('Please enter a barcode', 'warning');
+        return;
+    }
+    
+    if (isProcessing) {
+        showStatus('Please wait for current scan to complete', 'warning');
+        return;
+    }
+    
+    isProcessing = true;
+    showStatus('Looking up barcode...', 'info');
+    
+    try {
+        const response = await fetch('/scan', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ barcode: barcode })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            showStatus(`Successfully added: ${data.title} by ${data.artist}`, 'success');
+            addToRecentScans(data);
+            input.value = '';  // Clear input for next scan
+        } else {
+            showStatus(data.error || 'Unknown error occurred', 'error');
+        }
+    } catch (error) {
+        showStatus('Network error: ' + error.message, 'error');
+    } finally {
+        isProcessing = false;
+        input.focus();  // Return focus to input
+    }
+}
+
+function showStatus(message, type) {
+    const statusDiv = document.getElementById('status');
+    statusDiv.innerHTML = `<div class="alert alert-${type === 'info' ? 'warning' : type}">${message}</div>`;
+    
+    // Auto-clear success messages after 3 seconds
+    if (type === 'success') {
+        setTimeout(() => {
+            statusDiv.innerHTML = '';
+        }, 3000);
+    }
+}
+
+function addToRecentScans(data) {
+    const resultsDiv = document.getElementById('scan-results');
+    const scanItem = document.createElement('div');
+    scanItem.style.padding = '1rem';
+    scanItem.style.border = '1px solid #ddd';
+    scanItem.style.borderRadius = '4px';
+    scanItem.style.marginBottom = '0.5rem';
+    scanItem.style.backgroundColor = '#f8f9fa';
+    
+    scanItem.innerHTML = `
+        <strong>${data.title}</strong> by ${data.artist}<br>
+        <small>Barcode: ${data.barcode} | First Release: ${data.first_release}</small>
+    `;
+    
+    // Insert at the top
+    if (resultsDiv.firstChild) {
+        resultsDiv.insertBefore(scanItem, resultsDiv.firstChild);
+    } else {
+        resultsDiv.appendChild(scanItem);
+    }
+    
+    // Keep only the last 10 scans
+    while (resultsDiv.children.length > 10) {
+        resultsDiv.removeChild(resultsDiv.lastChild);
+    }
+}
+
+// Auto-focus on input when page loads
+window.onload = function() {
+    document.getElementById('barcode-input').focus();
+};
+</script>
+{% endblock %}

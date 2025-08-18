@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Album Catalog{% endblock %}
+
+{% block header %}Album Catalog{% endblock %}
+
+{% block content %}
+<h2>Album Catalog</h2>
+<p>{{ catalog|length }} albums in catalog. Click on any row to view full details.</p>
+
+{% if catalog %}
+<table class="table">
+    <thead>
+        <tr>
+            <th>Artist</th>
+            <th>Album</th>
+            <th>First Release</th>
+            <th>Country</th>
+            <th>Barcode</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for album in catalog %}
+        <tr class="clickable" onclick="window.location.href='{{ url_for('album_detail', barcode=album.Barcode) }}'">
+            <td>{{ album.Artist or 'Unknown Artist' }}</td>
+            <td>{{ album['Album/Release'] or 'Unknown Album' }}</td>
+            <td>{{ album['First Release'] or 'Unknown' }}</td>
+            <td>{{ album.Country or 'Unknown' }}</td>
+            <td>{{ album.Barcode or 'No barcode' }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="alert alert-warning">
+    No albums in catalog yet. <a href="{{ url_for('index') }}">Start scanning barcodes</a> to build your catalog.
+</div>
+{% endif %}
+{% endblock %}
