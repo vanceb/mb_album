@@ -7,10 +7,15 @@ __pycache__
 *secret.py
 spotify_token.json
 
-*.yaml
-*.yml
-*.csv
+# Data Files
+catalog.csv
+barcode_tracks.json
+
+# Directory containing coverart
+coverart        
+
+# Exported files
+byyear.yaml
+byartist.yaml
 
 README.html
-
-coverart

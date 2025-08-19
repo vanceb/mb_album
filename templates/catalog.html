@@ -5,35 +5,106 @@
 {% block header %}Album Catalog{% endblock %}
 
 {% block content %}
-<h2>Album Catalog</h2>
-<p>{{ catalog|length }} albums in catalog. Click on any row to view full details.</p>
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+    <div>
+        <h2 style="margin: 0;">Album Catalog</h2>
+        <p style="margin: 0.5rem 0;">{{ catalog|length }} albums in catalog. Click on any item to view full details.</p>
+    </div>
+    <div>
+        <button id="list-view-btn" class="view-btn active" onclick="showListView()">List View</button>
+        <button id="grid-view-btn" class="view-btn" onclick="showGridView()">Album Art View</button>
+    </div>
+</div>
 
 {% if catalog %}
-<table class="table">
-    <thead>
-        <tr>
-            <th>Artist</th>
-            <th>Album</th>
-            <th>First Release</th>
-            <th>Country</th>
-            <th>Barcode</th>
-        </tr>
-    </thead>
-    <tbody>
+<!-- List View -->
+<div id="list-view">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Artist</th>
+                <th>Album</th>
+                <th>First Release</th>
+                <th>Country</th>
+                <th>Barcode</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for album in catalog %}
+            <tr class="clickable" onclick="window.location.href='{{ url_for('album_detail', barcode=album.Barcode) }}'">
+                <td>{{ album.Artist or 'Unknown Artist' }}</td>
+                <td>{{ album['Album/Release'] or 'Unknown Album' }}</td>
+                <td>{{ album['First Release'] or 'Unknown' }}</td>
+                <td>{{ album.Country or 'Unknown' }}</td>
+                <td>{{ album.Barcode or 'No barcode' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Grid View -->
+<div id="grid-view" style="display: none;">
+    <div class="album-grid">
         {% for album in catalog %}
-        <tr class="clickable" onclick="window.location.href='{{ url_for('album_detail', barcode=album.Barcode) }}'">
-            <td>{{ album.Artist or 'Unknown Artist' }}</td>
-            <td>{{ album['Album/Release'] or 'Unknown Album' }}</td>
-            <td>{{ album['First Release'] or 'Unknown' }}</td>
-            <td>{{ album.Country or 'Unknown' }}</td>
-            <td>{{ album.Barcode or 'No barcode' }}</td>
-        </tr>
+        <div class="album-card clickable" onclick="window.location.href='{{ url_for('album_detail', barcode=album.Barcode) }}'">
+            {% set cover_path = 'coverart/' + album.Barcode + '.jpg' %}
+            <div class="album-cover">
+                <img src="{{ url_for('static', filename=cover_path) }}" 
+                     alt="Album cover" 
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                <div class="no-cover-placeholder" style="display: none;">
+                    <span>No Cover</span>
+                </div>
+            </div>
+            <div class="album-info">
+                <div class="album-title">{{ album['Album/Release'] or 'Unknown Album' }}</div>
+                <div class="album-artist">{{ album.Artist or 'Unknown Artist' }}</div>
+                <div class="album-year">
+                    {% if album['First Release'] %}
+                        {{ album['First Release'][:4] if album['First Release']|length >= 4 else album['First Release'] }}
+                    {% else %}
+                        Unknown Year
+                    {% endif %}
+                </div>
+            </div>
+        </div>
         {% endfor %}
-    </tbody>
-</table>
+    </div>
+</div>
 {% else %}
 <div class="alert alert-warning">
     No albums in catalog yet. <a href="{{ url_for('index') }}">Start scanning barcodes</a> to build your catalog.
 </div>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showListView() {
+    document.getElementById('list-view').style.display = 'block';
+    document.getElementById('grid-view').style.display = 'none';
+    document.getElementById('list-view-btn').classList.add('active');
+    document.getElementById('grid-view-btn').classList.remove('active');
+    localStorage.setItem('catalog-view', 'list');
+}
+
+function showGridView() {
+    document.getElementById('list-view').style.display = 'none';
+    document.getElementById('grid-view').style.display = 'block';
+    document.getElementById('list-view-btn').classList.remove('active');
+    document.getElementById('grid-view-btn').classList.add('active');
+    localStorage.setItem('catalog-view', 'grid');
+}
+
+// Remember user's view preference
+window.onload = function() {
+    const savedView = localStorage.getItem('catalog-view');
+    if (savedView === 'grid') {
+        showGridView();
+    } else {
+        showListView();
+    }
+};
+</script>
 {% endblock %}

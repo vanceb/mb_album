@@ -2,7 +2,7 @@
 
 {% block title %}{{ album.Artist }} - {{ album['Album/Release'] }}{% endblock %}
 
-{% block header %}{{ album.Artist }} - {{ album['Album/Release'] }}{% endblock %}
+{% block header %}{{ album.Artist }} - {{ album['Album/Release'] }} {% if album['First Release'] %}({{ album['First Release'][:4] if album['First Release']|length >= 4 else album['First Release'] }}){% endif %}{% endblock %}
 
 {% block content %}
 <div style="margin-bottom: 1rem;">
@@ -10,8 +10,8 @@
 </div>
 
 <div style="display: flex; gap: 2rem; align-items: flex-start;">
-    <!-- Cover Art -->
-    <div style="flex-shrink: 0;">
+    <!-- Left Column: Cover Art + Metadata -->
+    <div style="flex-shrink: 0; width: 300px;">
         {% set cover_path = 'coverart/' + album.Barcode + '.jpg' %}
         <img src="{{ url_for('static', filename=cover_path) }}" 
              alt="Album cover" 
@@ -20,55 +20,74 @@
         <div style="display: none; width: 300px; height: 300px; background-color: #f0f0f0; border: 2px dashed #ccc; border-radius: 8px; align-items: center; justify-content: center; color: #666;">
             No Cover Art
         </div>
+        
+        <!-- Metadata Dropdown -->
+        <div style="margin-top: 1rem;">
+            <button onclick="toggleMetadata()" style="background-color: #333; color: white; border: 1px solid #333; padding: 0.75rem 1rem; border-radius: 4px; cursor: pointer; width: 100%; text-align: left; display: flex; justify-content: space-between; align-items: center;">
+                <span><strong>Album Metadata</strong></span>
+                <span id="metadata-arrow">▼</span>
+            </button>
+            <div id="metadata-content" style="display: none; border: 1px solid #ddd; border-top: none; border-radius: 0 0 4px 4px; padding: 1rem; background-color: white;">
+                <table style="width: 100%; font-size: 0.9rem;">
+                    <tr>
+                        <td style="padding: 0.25rem 0; vertical-align: top;"><strong>First Release:</strong></td>
+                        <td style="padding: 0.25rem 0;">{{ album['First Release'] or 'Unknown' }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.25rem 0; vertical-align: top;"><strong>Release Date:</strong></td>
+                        <td style="padding: 0.25rem 0;">{{ album['Release Date'] or 'Unknown' }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.25rem 0; vertical-align: top;"><strong>Country:</strong></td>
+                        <td style="padding: 0.25rem 0;">{{ album.Country or 'Unknown' }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.25rem 0; vertical-align: top;"><strong>Barcode:</strong></td>
+                        <td style="padding: 0.25rem 0;"><code style="font-size: 0.8rem;">{{ album.Barcode or 'No barcode' }}</code></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.25rem 0; vertical-align: top;"><strong>MusicBrainz:</strong></td>
+                        <td style="padding: 0.25rem 0;">
+                            {% if album['MusicBrainz ID'] %}
+                            <a href="https://musicbrainz.org/release/{{ album['MusicBrainz ID'] }}" target="_blank" style="font-size: 0.8rem;">
+                                Link
+                            </a>
+                            {% else %}
+                            Unknown
+                            {% endif %}
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
     </div>
     
-    <!-- Album Details -->
+    <!-- Right Column: Track Listing -->
     <div style="flex-grow: 1;">
-        <h2>{{ album['Album/Release'] or 'Unknown Album' }}</h2>
-        <h3 style="color: #666; margin-top: 0;">by {{ album.Artist or 'Unknown Artist' }}</h3>
-        
-        <div style="margin: 2rem 0;">
-            <table class="table" style="max-width: 600px;">
-                <tr>
-                    <td><strong>First Release:</strong></td>
-                    <td>{{ album['First Release'] or 'Unknown' }}</td>
-                </tr>
-                <tr>
-                    <td><strong>Release Date:</strong></td>
-                    <td>{{ album['Release Date'] or 'Unknown' }}</td>
-                </tr>
-                <tr>
-                    <td><strong>Country:</strong></td>
-                    <td>{{ album.Country or 'Unknown' }}</td>
-                </tr>
-                <tr>
-                    <td><strong>Barcode:</strong></td>
-                    <td><code>{{ album.Barcode or 'No barcode' }}</code></td>
-                </tr>
-                <tr>
-                    <td><strong>MusicBrainz ID:</strong></td>
-                    <td>
-                        {% if album['MusicBrainz ID'] %}
-                        <a href="https://musicbrainz.org/release/{{ album['MusicBrainz ID'] }}" target="_blank">
-                            {{ album['MusicBrainz ID'] }}
-                        </a>
-                        {% else %}
-                        Unknown
-                        {% endif %}
-                    </td>
-                </tr>
-            </table>
-        </div>
-        
-        <!-- Track Listing -->
         {% if tracks %}
-        <h3>Track Listing</h3>
-        <ol style="background-color: #f8f9fa; padding: 1rem; border-radius: 4px;">
+        <ol style="background-color: #f8f9fa; padding: 1rem 2rem; border-radius: 4px; max-height: 500px; overflow-y: auto; line-height: 1.4; margin: 0;">
             {% for track in tracks %}
-            <li style="margin: 0.5rem 0;">{{ track }}</li>
+            <li style="margin: 0.5rem 0; padding-left: 1rem;">{{ track }}</li>
             {% endfor %}
         </ol>
         {% endif %}
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleMetadata() {
+    const content = document.getElementById('metadata-content');
+    const arrow = document.getElementById('metadata-arrow');
+    
+    if (content.style.display === 'none' || content.style.display === '') {
+        content.style.display = 'block';
+        arrow.textContent = '▲';
+    } else {
+        content.style.display = 'none';
+        arrow.textContent = '▼';
+    }
+}
+</script>
 {% endblock %}
