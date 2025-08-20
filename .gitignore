@@ -13,6 +13,7 @@ barcode_tracks.json
 manual_barcode.csv
 no_coverart.csv
 barcode_queue.db
+starred.csv
 
 # Shared data directory with runtime files
 shared_data/

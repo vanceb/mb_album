@@ -11,6 +11,7 @@ app = Flask(__name__)
 CATALOG_FILE = 'catalog.csv'
 CONFIG_FILE = 'csv_fields.json'
 TRACKS_CACHE_FILE = 'barcode_tracks.json'
+STARRED_FILE = 'starred.csv'
 
 # Start background worker on app startup (lazy initialization)
 def startup():
@@ -138,6 +139,59 @@ def update_no_coverart_cache():
         print("Updated no cover art cache")
     except Exception as e:
         print(f"Error updating no cover art cache: {e}")
+
+def load_starred_tracks():
+    """Load starred tracks from CSV file"""
+    starred_tracks = {}
+    if os.path.exists(STARRED_FILE):
+        try:
+            with open(STARRED_FILE, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    barcode = row.get('Barcode')
+                    track_number = row.get('Track')
+                    if barcode and track_number:
+                        if barcode not in starred_tracks:
+                            starred_tracks[barcode] = set()
+                        starred_tracks[barcode].add(track_number)
+        except Exception as e:
+            print(f"Error loading starred tracks: {e}")
+    return starred_tracks
+
+def save_starred_tracks(starred_tracks):
+    """Save starred tracks to CSV file"""
+    try:
+        with open(STARRED_FILE, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerow(['Barcode', 'Track'])
+            for barcode, track_numbers in starred_tracks.items():
+                for track_number in track_numbers:
+                    writer.writerow([barcode, track_number])
+        print(f"Saved {sum(len(track_numbers) for track_numbers in starred_tracks.values())} starred tracks")
+    except Exception as e:
+        print(f"Error saving starred tracks: {e}")
+
+def is_track_starred(barcode, track_number):
+    """Check if a track is starred"""
+    starred_tracks = load_starred_tracks()
+    return barcode in starred_tracks and str(track_number) in starred_tracks[barcode]
+
+def star_track(barcode, track_number):
+    """Star a track"""
+    starred_tracks = load_starred_tracks()
+    if barcode not in starred_tracks:
+        starred_tracks[barcode] = set()
+    starred_tracks[barcode].add(str(track_number))
+    save_starred_tracks(starred_tracks)
+
+def unstar_track(barcode, track_number):
+    """Unstar a track"""
+    starred_tracks = load_starred_tracks()
+    if barcode in starred_tracks and str(track_number) in starred_tracks[barcode]:
+        starred_tracks[barcode].remove(str(track_number))
+        if not starred_tracks[barcode]:  # Remove barcode if no tracks left
+            del starred_tracks[barcode]
+        save_starred_tracks(starred_tracks)
 
 @app.route('/')
 def index():
@@ -347,6 +401,25 @@ def missing_coverart():
     
     return render_template('missing_coverart.html', albums=enriched_albums)
 
+@app.route('/star/<barcode>/<track_number>', methods=['POST'])
+def star_track_endpoint(barcode, track_number):
+    """Star a track"""
+    try:
+        star_track(barcode, track_number)
+        return jsonify({'success': True, 'message': f'Starred track #{track_number}'})
+    except Exception as e:
+        print(f"Error starring track #{track_number} for {barcode}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/unstar/<barcode>/<track_number>', methods=['POST'])
+def unstar_track_endpoint(barcode, track_number):
+    """Unstar a track"""
+    try:
+        unstar_track(barcode, track_number)
+        return jsonify({'success': True, 'message': f'Unstarred track #{track_number}'})
+    except Exception as e:
+        print(f"Error unstarring track #{track_number} for {barcode}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/album/<barcode>')
 def album_detail(barcode):
@@ -361,7 +434,11 @@ def album_detail(barcode):
     mbid = album.get('MusicBrainz ID')
     tracks = get_tracks(barcode, mbid)
     
-    return render_template('album_detail.html', album=album, tracks=tracks)
+    # Get starred tracks for this album
+    starred_tracks = load_starred_tracks()
+    starred_set = starred_tracks.get(barcode, set())
+    
+    return render_template('album_detail.html', album=album, tracks=tracks, starred_tracks=starred_set)
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
