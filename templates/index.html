@@ -10,7 +10,7 @@
 
 <div id="scanner-area">
     <input type="text" id="barcode-input" placeholder="Scan or type barcode here" autofocus>
-    <button onclick="processBarcode()">Lookup</button>
+    <button onclick="processBarcode()"><i class="fas fa-search"></i> Lookup</button>
 </div>
 
 <div id="status" style="margin-top: 1rem;"></div>
@@ -46,31 +46,137 @@ async function processBarcode() {
     }
     
     isProcessing = true;
-    showStatus('Looking up barcode...', 'info');
+    showStatus('Processing barcode...', 'info');
     
     try {
+        // Add timeout to prevent infinite hanging
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+            controller.abort();
+        }, 30000); // 30 second timeout
+        
         const response = await fetch('/scan', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ barcode: barcode })
+            body: JSON.stringify({ barcode: barcode }),
+            signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
         
         const data = await response.json();
         
         if (response.ok && data.success) {
-            showStatus(`Successfully added: ${data.title} by ${data.artist}`, 'success');
-            addToRecentScans(data);
+            if (data.status === 'already_exists') {
+                showStatus(`Already in catalog: ${data.title} by ${data.artist}`, 'success');
+                addToRecentScans({...data, status: 'Already in catalog'});
+            } else if (data.status === 'queued') {
+                showStatus(`Barcode queued for processing (position ${data.position})`, 'info');
+                addToRecentScans({
+                    barcode: data.barcode,
+                    title: 'Processing...',
+                    artist: 'Please wait',
+                    status: `Queued (position ${data.position})`
+                });
+                // Start polling for status updates
+                pollBarcodeStatus(data.barcode);
+            } else if (data.status === 'in_queue') {
+                showStatus(`Barcode already in queue: ${data.queue_status}`, 'warning');
+            }
             input.value = '';  // Clear input for next scan
         } else {
             showStatus(data.error || 'Unknown error occurred', 'error');
         }
     } catch (error) {
-        showStatus('Network error: ' + error.message, 'error');
+        if (error.name === 'AbortError') {
+            showStatus('Request timeout - but barcode may still be processing. Check Recent Scans below.', 'warning');
+        } else {
+            showStatus('Network error: ' + error.message, 'error');
+        }
     } finally {
         isProcessing = false;
         input.focus();  // Return focus to input
+    }
+}
+
+async function pollBarcodeStatus(barcode) {
+    const maxAttempts = 120; // Poll for up to 2 minutes
+    let attempts = 0;
+    
+    const poll = async () => {
+        try {
+            const response = await fetch(`/status/${barcode}`);
+            const data = await response.json();
+            
+            if (response.ok) {
+                updateBarcodeStatus(barcode, data);
+                
+                if (data.status === 'complete') {
+                    showStatus(`Completed: ${data.title} by ${data.artist}`, 'success');
+                    return; // Stop polling
+                } else if (data.status === 'failed') {
+                    showStatus(`Failed to process ${barcode}: ${data.error || 'Unknown error'}`, 'error');
+                    return; // Stop polling
+                }
+            }
+            
+            attempts++;
+            if (attempts < maxAttempts) {
+                setTimeout(poll, 2000); // Poll every 2 seconds
+            } else {
+                showStatus(`Polling timeout for ${barcode}`, 'warning');
+            }
+        } catch (error) {
+            attempts++;
+            if (attempts < maxAttempts) {
+                setTimeout(poll, 5000); // Longer delay on error
+            }
+        }
+    };
+    
+    // Start polling after initial delay
+    setTimeout(poll, 2000);
+}
+
+function updateBarcodeStatus(barcode, statusData) {
+    // Find and update the barcode in recent scans
+    const resultsDiv = document.getElementById('scan-results');
+    const scanItems = resultsDiv.querySelectorAll('div');
+    
+    for (const item of scanItems) {
+        const itemBarcode = item.querySelector('small')?.textContent?.split('Barcode: ')[1]?.split(' |')[0];
+        if (itemBarcode === barcode) {
+            let statusText = statusData.status;
+            let title = statusData.title || 'Processing...';
+            let artist = statusData.artist || 'Please wait';
+            
+            if (statusData.status === 'processing' && statusData.steps) {
+                const completedSteps = Object.values(statusData.steps).filter(Boolean).length;
+                statusText = `Processing (${completedSteps}/3 steps)`;
+            } else if (statusData.status === 'pending' && statusData.position) {
+                statusText = `Queued (position ${statusData.position})`;
+            }
+            
+            item.innerHTML = `
+                <strong>${title}</strong> by ${artist}<br>
+                <small>Barcode: ${barcode} | Status: ${statusText}</small>
+            `;
+            
+            // Update styling based on status
+            if (statusData.status === 'complete') {
+                item.style.backgroundColor = '#d4edda';
+                item.style.borderColor = '#c3e6cb';
+            } else if (statusData.status === 'failed') {
+                item.style.backgroundColor = '#f8d7da';
+                item.style.borderColor = '#f5c6cb';
+            } else {
+                item.style.backgroundColor = '#fff3cd';
+                item.style.borderColor = '#ffeaa7';
+            }
+            break;
+        }
     }
 }
 
@@ -93,11 +199,27 @@ function addToRecentScans(data) {
     scanItem.style.border = '1px solid #ddd';
     scanItem.style.borderRadius = '4px';
     scanItem.style.marginBottom = '0.5rem';
-    scanItem.style.backgroundColor = '#f8f9fa';
+    
+    // Set background color based on status
+    if (data.status === 'Already in catalog' || data.status === 'complete') {
+        scanItem.style.backgroundColor = '#d4edda';
+        scanItem.style.borderColor = '#c3e6cb';
+    } else if (data.status && data.status.includes('failed')) {
+        scanItem.style.backgroundColor = '#f8d7da';
+        scanItem.style.borderColor = '#f5c6cb';
+    } else {
+        scanItem.style.backgroundColor = '#fff3cd';
+        scanItem.style.borderColor = '#ffeaa7';
+    }
+    
+    const title = data.title || 'Processing...';
+    const artist = data.artist || 'Please wait';
+    const statusText = data.status || 'Unknown';
+    const firstRelease = data.first_release || data.release_date || '';
     
     scanItem.innerHTML = `
-        <strong>${data.title}</strong> by ${data.artist}<br>
-        <small>Barcode: ${data.barcode} | First Release: ${data.first_release}</small>
+        <strong>${title}</strong> by ${artist}<br>
+        <small>Barcode: ${data.barcode} | Status: ${statusText}${firstRelease ? ' | ' + firstRelease : ''}</small>
     `;
     
     // Insert at the top

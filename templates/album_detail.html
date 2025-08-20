@@ -6,7 +6,7 @@
 
 {% block content %}
 <div style="margin-bottom: 1rem;">
-    <a href="{{ url_for('catalog') }}">&larr; Back to Catalog</a>
+    <a href="{{ url_for('catalog') }}"><i class="fas fa-arrow-left"></i> Back to Catalog</a>
 </div>
 
 <div style="display: flex; gap: 2rem; align-items: flex-start;">
@@ -25,7 +25,7 @@
         <div style="margin-top: 1rem;">
             <button onclick="toggleMetadata()" style="background-color: #333; color: white; border: 1px solid #333; padding: 0.75rem 1rem; border-radius: 4px; cursor: pointer; width: 100%; text-align: left; display: flex; justify-content: space-between; align-items: center;">
                 <span><strong>Album Metadata</strong></span>
-                <span id="metadata-arrow">▼</span>
+                <span id="metadata-arrow"><i class="fas fa-chevron-down"></i></span>
             </button>
             <div id="metadata-content" style="display: none; border: 1px solid #ddd; border-top: none; border-radius: 0 0 4px 4px; padding: 1rem; background-color: white;">
                 <table style="width: 100%; font-size: 0.9rem;">
@@ -50,7 +50,7 @@
                         <td style="padding: 0.25rem 0;">
                             {% if album['MusicBrainz ID'] %}
                             <a href="https://musicbrainz.org/release/{{ album['MusicBrainz ID'] }}" target="_blank" style="font-size: 0.8rem;">
-                                Link
+                                <i class="fas fa-external-link-alt"></i> MusicBrainz
                             </a>
                             {% else %}
                             Unknown
@@ -83,10 +83,10 @@ function toggleMetadata() {
     
     if (content.style.display === 'none' || content.style.display === '') {
         content.style.display = 'block';
-        arrow.textContent = '▲';
+        arrow.innerHTML = '<i class="fas fa-chevron-up"></i>';
     } else {
         content.style.display = 'none';
-        arrow.textContent = '▼';
+        arrow.innerHTML = '<i class="fas fa-chevron-down"></i>';
     }
 }
 </script>

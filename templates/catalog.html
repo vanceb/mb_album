@@ -11,8 +11,8 @@
         <p style="margin: 0.5rem 0;">{{ catalog|length }} albums in catalog. Click on any item to view full details.</p>
     </div>
     <div>
-        <button id="list-view-btn" class="view-btn active" onclick="showListView()">List View</button>
-        <button id="grid-view-btn" class="view-btn" onclick="showGridView()">Album Art View</button>
+        <button id="list-view-btn" class="view-btn active" onclick="showListView()"><i class="fas fa-list"></i> List View</button>
+        <button id="grid-view-btn" class="view-btn" onclick="showGridView()"><i class="fas fa-th"></i> Album Art View</button>
     </div>
 </div>
 
@@ -22,20 +22,29 @@
     <table class="table">
         <thead>
             <tr>
+                <th style="width: 60px;"></th>
                 <th>Artist</th>
                 <th>Album</th>
                 <th>First Release</th>
-                <th>Country</th>
                 <th>Barcode</th>
             </tr>
         </thead>
         <tbody>
             {% for album in catalog %}
             <tr class="clickable" onclick="window.location.href='{{ url_for('album_detail', barcode=album.Barcode) }}'">
+                <td style="padding: 4px;">
+                    {% set cover_path = 'coverart/' + album.Barcode + '.jpg' %}
+                    <img src="{{ url_for('static', filename=cover_path) }}" 
+                         alt="Album cover" 
+                         style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;"
+                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                    <div style="display: none; width: 50px; height: 50px; background-color: #f0f0f0; border: 1px solid #ddd; border-radius: 4px; align-items: center; justify-content: center; font-size: 10px; color: #666;">
+                        No Cover
+                    </div>
+                </td>
                 <td>{{ album.Artist or 'Unknown Artist' }}</td>
                 <td>{{ album['Album/Release'] or 'Unknown Album' }}</td>
                 <td>{{ album['First Release'] or 'Unknown' }}</td>
-                <td>{{ album.Country or 'Unknown' }}</td>
                 <td>{{ album.Barcode or 'No barcode' }}</td>
             </tr>
             {% endfor %}

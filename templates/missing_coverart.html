@@ -1,0 +1,289 @@
+{% extends "base.html" %}
+
+{% block title %}Missing Cover Art{% endblock %}
+
+{% block header %}Missing Cover Art Management{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 2rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <p style="margin: 0; color: #666;">Manage albums that don't have cover art downloaded. You can retry downloads or view album details.</p>
+        </div>
+        <div>
+            <button onclick="refreshList()" style="margin-right: 1rem; padding: 0.5rem 1rem; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                <i class="fas fa-sync-alt"></i> Refresh List
+            </button>
+            <button onclick="retryAllCoverArt()" style="padding: 0.5rem 1rem; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                <i class="fas fa-download"></i> Retry All
+            </button>
+        </div>
+    </div>
+</div>
+
+<div id="albums-container">
+    {% if albums and albums|length > 0 %}
+        <div style="margin-bottom: 1rem;">
+            <h3>{{ albums|length }} Album{{ 's' if albums|length != 1 else '' }} Without Cover Art</h3>
+        </div>
+        
+        <div style="display: grid; gap: 1rem;">
+            {% for album in albums %}
+            <div class="album-card" id="album-{{ album.Barcode }}" style="border: 1px solid #ddd; border-radius: 8px; padding: 1.5rem; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <div style="display: flex; justify-content: space-between; align-items: start; gap: 1rem;">
+                    <div style="flex: 1;">
+                        <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
+                            <h4 style="margin: 0; color: #333;">{{ album.Artist }}</h4>
+                            <span style="margin: 0 0.5rem; color: #666;">•</span>
+                            <h4 style="margin: 0; color: #666; font-weight: normal;">{{ album.Album }}</h4>
+                        </div>
+                        <div style="font-size: 0.9rem; color: #888;">
+                            <strong>Barcode:</strong> {{ album.Barcode }}
+                        </div>
+                        <div id="status-{{ album.Barcode }}" style="margin-top: 0.5rem; font-size: 0.9rem; color: #666;">
+                            Ready for retry
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <button 
+                            onclick="retryCoverArt('{{ album.Barcode }}', '{{ album.Artist|replace("'", "\\'") }}', '{{ album.Album|replace("'", "\\'") }}')" 
+                            id="retry-btn-{{ album.Barcode }}"
+                            style="padding: 0.5rem 1rem; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem;">
+                            <i class="fas fa-download"></i> Retry Download
+                        </button>
+                        {% if album.MBID %}
+                        <button 
+                            onclick="window.open('https://musicbrainz.org/release/{{ album.MBID }}', '_blank')" 
+                            style="padding: 0.5rem 1rem; background: #6f42c1; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem;">
+                            <i class="fas fa-external-link-alt"></i> Show on MusicBrainz
+                        </button>
+                        {% else %}
+                        <button 
+                            disabled
+                            title="No MusicBrainz ID available"
+                            style="padding: 0.5rem 1rem; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: not-allowed; font-size: 0.9rem;">
+                            <i class="fas fa-ban"></i> No MBID
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div style="text-align: center; padding: 4rem; background: #f8f9fa; border-radius: 8px;">
+            <div style="font-size: 3rem; margin-bottom: 1rem; color: #28a745;"><i class="fas fa-check-circle"></i></div>
+            <h3 style="color: #28a745; margin-bottom: 1rem;">All Cover Art Downloaded!</h3>
+            <p style="color: #666;">No albums are missing cover art. Great job!</p>
+            <button onclick="window.location.href='/catalog'" style="margin-top: 1rem; padding: 0.5rem 1.5rem; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                View Catalog
+            </button>
+        </div>
+    {% endif %}
+</div>
+
+<script>
+async function refreshList() {
+    try {
+        location.reload();
+    } catch (error) {
+        console.error('Error refreshing list:', error);
+        alert('Error refreshing list');
+    }
+}
+
+async function retryCoverArt(barcode, artist, album) {
+    const button = document.getElementById(`retry-btn-${barcode}`);
+    const status = document.getElementById(`status-${barcode}`);
+    const originalText = button.textContent;
+    
+    // Disable button and show loading state
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Downloading...';
+    button.style.backgroundColor = '#6c757d';
+    status.textContent = 'Attempting download...';
+    status.style.color = '#007bff';
+    
+    try {
+        const response = await fetch(`/queue/retry-coverart/${barcode}`, {
+            method: 'POST'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Success - remove the album card with animation
+            const albumCard = document.getElementById(`album-${barcode}`);
+            if (albumCard) {
+                status.innerHTML = '<i class="fas fa-check-circle" style="color: #28a745;"></i> Download successful!';
+                status.style.color = '#28a745';
+                
+                setTimeout(() => {
+                    albumCard.style.transition = 'all 0.5s ease';
+                    albumCard.style.opacity = '0';
+                    albumCard.style.transform = 'translateX(100%)';
+                    
+                    setTimeout(() => {
+                        albumCard.remove();
+                        updatePageAfterRemoval();
+                    }, 500);
+                }, 1000);
+            }
+            
+            // Show success notification
+            showNotification(`Cover art downloaded successfully for "${artist} - ${album}"`, 'success');
+        } else {
+            // Failed - re-enable button
+            button.disabled = false;
+            button.textContent = originalText;
+            button.style.backgroundColor = '#28a745';
+            status.innerHTML = `<i class="fas fa-times-circle" style="color: #dc3545;"></i> Failed: ${data.error || 'Unknown error'}`;
+            status.style.color = '#dc3545';
+            
+            showNotification(`Failed to download cover art: ${data.error || 'Unknown error'}`, 'error');
+        }
+    } catch (error) {
+        console.error('Error retrying cover art:', error);
+        
+        // Re-enable button on error
+        button.disabled = false;
+        button.textContent = originalText;
+        button.style.backgroundColor = '#28a745';
+        status.innerHTML = '<i class="fas fa-times-circle" style="color: #dc3545;"></i> Error occurred during download';
+        status.style.color = '#dc3545';
+        
+        showNotification('Error retrying cover art download', 'error');
+    }
+}
+
+async function retryAllCoverArt() {
+    const albumCards = document.querySelectorAll('.album-card');
+    if (albumCards.length === 0) {
+        showNotification('No albums to retry', 'info');
+        return;
+    }
+    
+    if (!confirm(`Are you sure you want to retry downloading cover art for all ${albumCards.length} albums? This may take some time.`)) {
+        return;
+    }
+    
+    let successCount = 0;
+    let failCount = 0;
+    
+    for (const card of albumCards) {
+        const barcode = card.id.replace('album-', '');
+        const button = card.querySelector(`#retry-btn-${barcode}`);
+        
+        if (button && !button.disabled) {
+            // Trigger the individual retry
+            button.click();
+            
+            // Wait a bit between requests to be respectful
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+    }
+    
+    showNotification('Batch retry initiated. Check individual album status for results.', 'info');
+}
+
+function updatePageAfterRemoval() {
+    const remainingCards = document.querySelectorAll('.album-card');
+    const container = document.getElementById('albums-container');
+    
+    if (remainingCards.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 4rem; background: #f8f9fa; border-radius: 8px;">
+                <div style="font-size: 3rem; margin-bottom: 1rem; color: #28a745;"><i class="fas fa-check-circle"></i></div>
+                <h3 style="color: #28a745; margin-bottom: 1rem;">All Cover Art Downloaded!</h3>
+                <p style="color: #666;">No albums are missing cover art. Great job!</p>
+                <button onclick="window.location.href='/catalog'" style="margin-top: 1rem; padding: 0.5rem 1.5rem; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                    View Catalog
+                </button>
+            </div>
+        `;
+    } else {
+        const header = document.querySelector('h3');
+        if (header) {
+            const count = remainingCards.length;
+            header.textContent = `${count} Album${count !== 1 ? 's' : ''} Without Cover Art`;
+        }
+    }
+}
+
+
+function showNotification(message, type) {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 1rem 1.5rem;
+        border-radius: 4px;
+        color: white;
+        font-weight: 500;
+        z-index: 1000;
+        max-width: 400px;
+        opacity: 0;
+        transform: translateX(100%);
+        transition: all 0.3s ease;
+    `;
+    
+    // Set colors based on type
+    switch (type) {
+        case 'success':
+            notification.style.backgroundColor = '#28a745';
+            notification.innerHTML = '<i class="fas fa-check-circle"></i> ' + message;
+            break;
+        case 'error':
+            notification.style.backgroundColor = '#dc3545';
+            notification.innerHTML = '<i class="fas fa-times-circle"></i> ' + message;
+            break;
+        case 'info':
+            notification.style.backgroundColor = '#007bff';
+            notification.innerHTML = '<i class="fas fa-info-circle"></i> ' + message;
+            break;
+        default:
+            notification.style.backgroundColor = '#6c757d';
+            notification.innerHTML = message;
+    }
+    
+    document.body.appendChild(notification);
+    
+    // Animate in
+    setTimeout(() => {
+        notification.style.opacity = '1';
+        notification.style.transform = 'translateX(0)';
+    }, 100);
+    
+    // Animate out and remove
+    setTimeout(() => {
+        notification.style.opacity = '0';
+        notification.style.transform = 'translateX(100%)';
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 300);
+    }, 4000);
+}
+</script>
+
+<style>
+.album-card:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    transform: translateY(-1px);
+    transition: all 0.2s ease;
+}
+
+button:hover {
+    transform: translateY(-1px);
+    transition: all 0.2s ease;
+}
+
+button:disabled {
+    cursor: not-allowed !important;
+    transform: none !important;
+}
+</style>
+{% endblock %}

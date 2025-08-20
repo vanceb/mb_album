@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+
+{% block title %}Queue Management{% endblock %}
+
+{% block header %}Queue Management{% endblock %}
+
+{% block content %}
+<div style="display: flex; gap: 2rem; margin-bottom: 2rem;">
+    <!-- Queue Statistics -->
+    <div style="flex: 2;">
+        <h3>Queue Statistics</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem;">
+            <div class="stat-box-total" style="background: #f8f9fa; padding: 1rem; border-radius: 4px; text-align: center;">
+                <div style="font-size: 2rem; font-weight: bold; color: #007bff;">{{ stats.queue.total or 0 }}</div>
+                <div style="font-size: 0.9rem; color: #666;">Total</div>
+            </div>
+            <div class="stat-box-pending" style="background: #fff3cd; padding: 1rem; border-radius: 4px; text-align: center;">
+                <div style="font-size: 2rem; font-weight: bold; color: #856404;">{{ stats.queue.pending or 0 }}</div>
+                <div style="font-size: 0.9rem; color: #666;">Pending</div>
+            </div>
+            <div class="stat-box-processing" style="background: #cce5ff; padding: 1rem; border-radius: 4px; text-align: center;">
+                <div style="font-size: 2rem; font-weight: bold; color: #004085;">{{ stats.queue.processing or 0 }}</div>
+                <div style="font-size: 0.9rem; color: #666;">Processing</div>
+            </div>
+            <div class="stat-box-complete" style="background: #d4edda; padding: 1rem; border-radius: 4px; text-align: center;">
+                <div style="font-size: 2rem; font-weight: bold; color: #155724;">{{ stats.queue.complete or 0 }}</div>
+                <div style="font-size: 0.9rem; color: #666;">Complete</div>
+            </div>
+            <div class="stat-box-failed" style="background: #f8d7da; padding: 1rem; border-radius: 4px; text-align: center;">
+                <div style="font-size: 2rem; font-weight: bold; color: #721c24;">{{ stats.queue.failed or 0 }}</div>
+                <div style="font-size: 0.9rem; color: #666;">Failed</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Worker Status -->
+    <div style="flex: 1;">
+        <h3>Worker Status</h3>
+        <div style="background: #f8f9fa; padding: 1rem; border-radius: 4px;">
+            <div class="worker-status" style="margin-bottom: 0.5rem;">
+                <strong>Status:</strong> 
+                {% if stats.worker_healthy %}
+                    <span style="color: green;"><i class="fas fa-check-circle"></i> Running (Healthy)</span>
+                {% elif stats.is_running %}
+                    <span style="color: orange;"><i class="fas fa-exclamation-triangle"></i> Running (Stale - {{ "%.1f"|format(stats.seconds_since_heartbeat or 0) }}s ago)</span>
+                {% else %}
+                    <span style="color: red;"><i class="fas fa-times-circle"></i> Stopped</span>
+                {% endif %}
+            </div>
+            {% if stats.worker_pid %}
+            <div class="worker-pid" style="margin-bottom: 0.5rem;">
+                <strong>Process ID:</strong> {{ stats.worker_pid }}
+            </div>
+            {% endif %}
+            {% if stats.last_heartbeat %}
+            <div class="last-heartbeat" style="margin-bottom: 0.5rem;">
+                <strong>Last Heartbeat:</strong> {{ stats.last_heartbeat.split('.')[0] if '.' in stats.last_heartbeat else stats.last_heartbeat }}
+            </div>
+            {% endif %}
+            {% if stats.processing %}
+            <div style="margin-bottom: 0.5rem;">
+                <strong>Current Delay:</strong> <span class="current-delay">{{ "%.1f"|format(stats.processing.current_backoff_seconds or 1.1) }}s</span>
+            </div>
+            <div style="margin-bottom: 0.5rem;">
+                <strong>Total Requests:</strong> <span class="total-requests">{{ stats.processing.total_requests or 0 }}</span>
+            </div>
+            <div style="margin-bottom: 0.5rem;">
+                <strong>Failed Requests:</strong> <span class="failed-requests">{{ stats.processing.failed_requests or 0 }}</span>
+            </div>
+            {% if stats.processing.last_503_time %}
+            <div class="last-503-time" style="margin-bottom: 0.5rem;">
+                <strong>Last 503 Error:</strong> {{ stats.processing.last_503_time }}
+            </div>
+            {% else %}
+            <div class="last-503-time" style="margin-bottom: 0.5rem; display: none;">
+                <strong>Last 503 Error:</strong> 
+            </div>
+            {% endif %}
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div style="margin-bottom: 2rem;">
+    <button onclick="refreshStats()" style="margin-right: 1rem;"><i class="fas fa-sync-alt"></i> Refresh Stats</button>
+    <button onclick="loadFailedBarcodes()" style="margin-right: 1rem;"><i class="fas fa-exclamation-triangle"></i> Show Failed Items</button>
+    <button onclick="window.location.href='/missing-coverart'" style="background: #28a745;"><i class="fas fa-image"></i> Manage Missing Cover Art</button>
+</div>
+
+<!-- Failed Barcodes Section -->
+<div id="failed-section" style="display: none;">
+    <h3>Failed Barcodes</h3>
+    <div id="failed-list"></div>
+</div>
+
+
+<script>
+async function refreshStats() {
+    try {
+        const response = await fetch('/queue/stats');
+        const data = await response.json();
+        
+        // Reload the page with updated stats
+        location.reload();
+    } catch (error) {
+        console.error('Error refreshing stats:', error);
+        alert('Error refreshing statistics');
+    }
+}
+
+async function loadFailedBarcodes() {
+    try {
+        const response = await fetch('/queue/failed');
+        const failed = await response.json();
+        
+        const section = document.getElementById('failed-section');
+        const list = document.getElementById('failed-list');
+        
+        if (failed.length === 0) {
+            list.innerHTML = '<p>No failed barcodes.</p>';
+        } else {
+            list.innerHTML = failed.map(item => `
+                <div style="border: 1px solid #ddd; border-radius: 4px; padding: 1rem; margin-bottom: 0.5rem; background: #f8d7da;">
+                    <div><strong>Barcode:</strong> ${item.barcode}</div>
+                    <div><strong>Error:</strong> ${item.error_message || 'Unknown error'}</div>
+                    <div><strong>Retry Count:</strong> ${item.retry_count}</div>
+                    <div><strong>Last Attempt:</strong> ${item.last_attempt || 'Never'}</div>
+                    <button onclick="retryBarcode('${item.barcode}')" style="margin-top: 0.5rem;">
+                        <i class="fas fa-redo-alt"></i> Retry
+                    </button>
+                </div>
+            `).join('');
+        }
+        
+        section.style.display = 'block';
+    } catch (error) {
+        console.error('Error loading failed barcodes:', error);
+        alert('Error loading failed barcodes');
+    }
+}
+
+async function retryBarcode(barcode) {
+    try {
+        const response = await fetch(`/queue/retry/${barcode}`, {
+            method: 'POST'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert(`Barcode ${barcode} reset for retry`);
+            loadFailedBarcodes(); // Refresh the failed list
+            refreshStats(); // Refresh stats
+        } else {
+            alert(`Failed to retry barcode: ${data.error || 'Unknown error'}`);
+        }
+    } catch (error) {
+        console.error('Error retrying barcode:', error);
+        alert('Error retrying barcode');
+    }
+}
+
+
+// Auto-refresh stats every 10 seconds
+setInterval(() => {
+    fetch('/queue/stats')
+        .then(response => response.json())
+        .then(data => {
+            updateStatsDisplay(data);
+        })
+        .catch(error => console.error('Stats refresh error:', error));
+}, 10000);
+
+function updateStatsDisplay(stats) {
+    // Update queue statistics
+    if (stats.queue) {
+        updateStatBox('total', stats.queue.total || 0);
+        updateStatBox('pending', stats.queue.pending || 0);
+        updateStatBox('processing', stats.queue.processing || 0);
+        updateStatBox('complete', stats.queue.complete || 0);
+        updateStatBox('failed', stats.queue.failed || 0);
+    }
+    
+    // Update worker status
+    updateWorkerStatus(stats);
+    
+    // Update processing stats if available
+    if (stats.processing) {
+        updateProcessingStats(stats.processing);
+    }
+}
+
+function updateStatBox(type, value) {
+    const elements = document.querySelectorAll('.stat-box-' + type);
+    elements.forEach(el => {
+        const valueDiv = el.querySelector('div[style*="font-size: 2rem"]');
+        if (valueDiv) {
+            valueDiv.textContent = value;
+        }
+    });
+}
+
+function updateWorkerStatus(stats) {
+    const statusElement = document.querySelector('.worker-status');
+    if (!statusElement) return;
+    
+    let statusHtml = '';
+    if (stats.worker_healthy) {
+        statusHtml = '<span style="color: green;"><i class="fas fa-check-circle"></i> Running (Healthy)</span>';
+    } else if (stats.is_running) {
+        statusHtml = `<span style="color: orange;"><i class="fas fa-exclamation-triangle"></i> Running (Stale - ${(stats.seconds_since_heartbeat || 0).toFixed(1)}s ago)</span>`;
+    } else {
+        statusHtml = '<span style="color: red;"><i class="fas fa-times-circle"></i> Stopped</span>';
+    }
+    statusElement.innerHTML = '<strong>Status:</strong> ' + statusHtml;
+    
+    // Update heartbeat timestamp if element exists
+    const heartbeatElement = document.querySelector('.last-heartbeat');
+    if (heartbeatElement && stats.last_heartbeat) {
+        // Format timestamp to remove decimals from seconds
+        let formattedTime = stats.last_heartbeat;
+        if (formattedTime.includes('.')) {
+            formattedTime = formattedTime.split('.')[0];
+        }
+        heartbeatElement.innerHTML = '<strong>Last Heartbeat:</strong> ' + formattedTime;
+    }
+    
+    // Update PID if element exists
+    const pidElement = document.querySelector('.worker-pid');
+    if (pidElement && stats.worker_pid) {
+        pidElement.innerHTML = '<strong>Process ID:</strong> ' + stats.worker_pid;
+    }
+}
+
+function updateProcessingStats(processing) {
+    const elements = {
+        'current-delay': processing.current_backoff_seconds ? (processing.current_backoff_seconds.toFixed(1) + 's') : '1.1s',
+        'total-requests': processing.total_requests || 0,
+        'failed-requests': processing.failed_requests || 0
+    };
+    
+    Object.entries(elements).forEach(([className, value]) => {
+        const element = document.querySelector('.' + className);
+        if (element) {
+            element.textContent = value;
+        }
+    });
+    
+    const last503Element = document.querySelector('.last-503-time');
+    if (last503Element) {
+        if (processing.last_503_time) {
+            last503Element.style.display = 'block';
+            last503Element.innerHTML = '<strong>Last 503 Error:</strong> ' + processing.last_503_time;
+        } else {
+            last503Element.style.display = 'none';
+        }
+    }
+}
+</script>
+{% endblock %}
