@@ -2,13 +2,35 @@ from flask import Flask, render_template, request, jsonify, redirect, url_for
 import csv
 import os
 import json
-from musicbrainz_barcode_lookup import MusicBrainzBarcodeLookup, write_release_to_csv, extract_json_path, download_cover_art
+import atexit
+from shared_data import shared_data
+from background_worker import get_worker, start_worker, stop_worker
 
 app = Flask(__name__)
 
 CATALOG_FILE = 'catalog.csv'
 CONFIG_FILE = 'csv_fields.json'
 TRACKS_CACHE_FILE = 'barcode_tracks.json'
+
+# Start background worker on app startup (lazy initialization)
+def startup():
+    try:
+        start_worker()
+        print("Asynchronous barcode processing started")
+    except Exception as e:
+        print(f"Failed to start background worker: {e}")
+        print("Worker will be started on first request")
+
+# Register startup function
+with app.app_context():
+    startup()
+
+# Graceful shutdown
+def shutdown():
+    print("Shutting down background worker...")
+    stop_worker()
+
+atexit.register(shutdown)
 
 def load_existing_barcodes():
     """Load existing barcodes from catalog to prevent duplicates"""
@@ -70,6 +92,53 @@ def get_tracks(barcode, mbid):
     
     return tracks
 
+def remove_from_no_coverart_csv(barcode_to_remove):
+    """Remove a barcode from the no_coverart.csv file"""
+    no_coverart_file = 'no_coverart.csv'
+    
+    if not os.path.exists(no_coverart_file):
+        return
+    
+    try:
+        # Read all entries
+        entries = []
+        with open(no_coverart_file, 'r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                if row.get('Barcode') != barcode_to_remove:
+                    entries.append(row)
+        
+        # Write back without the removed entry
+        with open(no_coverart_file, 'w', newline='', encoding='utf-8') as f:
+            if entries:
+                writer = csv.DictWriter(f, fieldnames=['Barcode', 'Artist', 'Album'])
+                writer.writeheader()
+                writer.writerows(entries)
+            else:
+                # If no entries left, just write header
+                writer = csv.writer(f)
+                writer.writerow(['Barcode', 'Artist', 'Album'])
+        
+        print(f"Removed {barcode_to_remove} from no_coverart.csv")
+    except Exception as e:
+        print(f"Error removing {barcode_to_remove} from no_coverart.csv: {e}")
+
+def update_no_coverart_cache():
+    """Update the shared data no cover art cache"""
+    try:
+        no_coverart_file = 'no_coverart.csv'
+        no_coverart_data = []
+        
+        if os.path.exists(no_coverart_file):
+            with open(no_coverart_file, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                no_coverart_data = list(reader)
+        
+        shared_data.update_no_coverart_cache(no_coverart_data)
+        print("Updated no cover art cache")
+    except Exception as e:
+        print(f"Error updating no cover art cache: {e}")
+
 @app.route('/')
 def index():
     """Main barcode scanning page"""
@@ -77,81 +146,213 @@ def index():
 
 @app.route('/scan', methods=['POST'])
 def scan_barcode():
-    """Handle barcode scanning and lookup"""
+    """Handle barcode scanning - add to shared pending queue"""
     data = request.get_json()
     barcode = data.get('barcode', '').strip()
     
     if not barcode:
         return jsonify({'error': 'No barcode provided'}), 400
     
-    # Check for duplicates
-    existing_barcodes = load_existing_barcodes()
-    if barcode in existing_barcodes:
-        return jsonify({'error': f'Barcode {barcode} already exists in catalog'}), 409
+    # Check if already in catalog (using shared data)
+    if shared_data.is_barcode_in_catalog(barcode):
+        # Return existing catalog data
+        catalog_item = shared_data.get_catalog_item(barcode)
+        if catalog_item:
+            response = {
+                'success': True,
+                'status': 'already_exists',
+                'barcode': barcode,
+                'title': catalog_item.get('Album/Release', 'Unknown Album'),
+                'artist': catalog_item.get('Artist', 'Unknown Artist'),
+                'first_release': catalog_item.get('First Release', 'Unknown')
+            }
+            return jsonify(response)
     
-    # Lookup barcode
-    lookup = MusicBrainzBarcodeLookup()
-    result = lookup.lookup_by_barcode(barcode)
-    
-    if not result:
-        return jsonify({'error': 'No album found for this barcode'}), 404
-    
-    # Extract album info for response
-    release = result['release']
-    full_release = result['full_release']
-    
-    title = release.get('title', 'Unknown Title')
-    artist = "Unknown Artist"
-    artist_credit = release.get('artist-credit')
-    if artist_credit and isinstance(artist_credit, list):
-        for credit in artist_credit:
-            if isinstance(credit, dict) and 'artist' in credit:
-                artist = credit['artist'].get('name', artist)
-                break
-    
-    # Get first release date
-    first_release = "Unknown Date"
-    release_group = full_release.get('release-group')
-    if release_group:
-        first_release = release_group.get('first-release-date', 'Unknown Date')
-    else:
-        first_release = full_release.get('date', 'Unknown Date')
-    
-    # Write to CSV
-    try:
-        write_release_to_csv(result, CATALOG_FILE, existing_barcodes, CONFIG_FILE)
-        
-        # Download cover art
-        mbid = release.get('id')
-        if mbid:
-            download_cover_art(mbid, barcode, folder="coverart")
-        
-        return jsonify({
+    # Check if already in processing queue (using shared data)
+    queue_status = shared_data.get_queue_status(barcode)
+    if queue_status:
+        response = {
             'success': True,
+            'status': 'in_queue',
             'barcode': barcode,
-            'title': title,
-            'artist': artist,
-            'first_release': first_release
-        })
+            'queue_status': queue_status['status'],
+            'position': queue_status.get('position'),
+            'retry_count': queue_status.get('retry_count', 0),
+            'message': f'Barcode already in queue with status: {queue_status["status"]}'
+        }
+        return jsonify(response)
+    
+    # Add to pending barcodes for worker to pick up
+    success = shared_data.add_pending_barcode(barcode)
+    if success:
+        response = {
+            'success': True,
+            'status': 'queued',
+            'barcode': barcode,
+            'position': 1,  # Will be determined by worker
+            'message': 'Barcode queued for processing'
+        }
+        return jsonify(response)
+    else:
+        return jsonify({'error': 'Failed to queue barcode'}), 500
+
+@app.route('/status/<barcode>')
+def barcode_status(barcode):
+    """Get current status of a barcode"""
+    # Check if in catalog first (using shared data)
+    if shared_data.is_barcode_in_catalog(barcode):
+        catalog_item = shared_data.get_catalog_item(barcode)
+        if catalog_item:
+            return jsonify({
+                'status': 'complete',
+                'barcode': barcode,
+                'title': catalog_item.get('Album/Release', 'Unknown Album'),
+                'artist': catalog_item.get('Artist', 'Unknown Artist'),
+                'first_release': catalog_item.get('First Release', 'Unknown'),
+                'in_catalog': True
+            })
+    
+    # Check queue status (using shared data)
+    queue_status = shared_data.get_queue_status(barcode)
+    if queue_status:
+        response = {
+            'status': queue_status['status'],
+            'barcode': barcode,
+            'retry_count': queue_status['retry_count'],
+            'in_catalog': False
+        }
+        
+        if queue_status.get('position'):
+            response['position'] = queue_status['position']
+        
+        if queue_status['status'] == 'processing':
+            response['steps'] = {
+                'metadata': queue_status.get('metadata_complete', False),
+                'coverart': queue_status.get('coverart_complete', False), 
+                'tracks': queue_status.get('tracks_complete', False)
+            }
+        
+        if queue_status.get('error_message'):
+            response['error'] = queue_status['error_message']
+            
+        if queue_status.get('artist') and queue_status.get('album'):
+            response['title'] = queue_status['album']
+            response['artist'] = queue_status['artist']
+            response['first_release'] = queue_status.get('release_date', 'Unknown')
+        
+        return jsonify(response)
+    
+    return jsonify({'error': 'Barcode not found'}), 404
+
+@app.route('/queue')
+def queue_status():
+    """Queue management page"""
+    stats = shared_data.get_worker_stats()
+    worker_status = stats  # Worker stats includes queue stats
+    return render_template('queue.html', stats=stats, worker_status=worker_status)
+
+@app.route('/queue/stats')
+def queue_stats_api():
+    """API endpoint for queue statistics"""
+    stats = shared_data.get_worker_stats()
+    return jsonify(stats)
+
+@app.route('/queue/failed')
+def failed_barcodes():
+    """Get failed barcodes for retry"""
+    # Get all queue items and filter for failed ones
+    all_queue = shared_data.get_queue_status()
+    failed = [item for item in all_queue.values() if item.get('status') == 'failed'] if all_queue else []
+    return jsonify(failed)
+
+@app.route('/queue/retry/<barcode>', methods=['POST'])
+def retry_barcode(barcode):
+    """Retry a failed barcode - add back to pending queue"""
+    success = shared_data.add_pending_barcode(barcode)
+    if success:
+        return jsonify({'success': True, 'message': f'Barcode {barcode} queued for retry'})
+    else:
+        return jsonify({'success': False, 'error': 'Failed to queue barcode for retry'}), 500
+
+@app.route('/queue/no-coverart')
+def no_coverart_list():
+    """Get list of albums without cover art"""
+    albums = shared_data.get_no_coverart_cache()
+    return jsonify(albums)
+
+@app.route('/queue/retry-coverart/<barcode>', methods=['POST'])
+def retry_coverart(barcode):
+    """Retry cover art download for a specific barcode"""
+    try:
+        # Find the album in catalog to get MBID
+        album = shared_data.get_catalog_item(barcode)
+        if not album:
+            return jsonify({'success': False, 'error': 'Album not found in catalog'}), 404
+        
+        mbid = album.get('MusicBrainz ID')
+        if not mbid:
+            return jsonify({'success': False, 'error': 'No MusicBrainz ID available for this album'}), 400
+        
+        # Import the MusicBrainz client
+        from async_musicbrainz import RateLimitedMusicBrainz
+        from rate_limiter import AdaptiveRateLimiter
+        
+        rate_limiter = AdaptiveRateLimiter()
+        mb_client = RateLimitedMusicBrainz(rate_limiter)
+        
+        # Attempt to download cover art
+        success = mb_client.download_cover_art(mbid, barcode, 'coverart')
+        
+        if success:
+            # Remove from no_coverart.csv if download was successful
+            remove_from_no_coverart_csv(barcode)
+            
+            # Update shared data cache to reflect the change
+            update_no_coverart_cache()
+            
+            return jsonify({
+                'success': True, 
+                'message': f'Cover art downloaded successfully for {album.get("Artist", "Unknown")} - {album.get("Album/Release", "Unknown")}'
+            })
+        else:
+            return jsonify({
+                'success': False, 
+                'error': 'Cover art not available or download failed'
+            })
+            
     except Exception as e:
-        return jsonify({'error': f'Failed to write to catalog: {str(e)}'}), 500
+        print(f"Error retrying cover art for {barcode}: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/catalog')
 def catalog():
     """Catalog review page"""
-    catalog_data = load_catalog()
+    catalog_data = shared_data.get_catalog_cache()
     return render_template('catalog.html', catalog=catalog_data)
+
+@app.route('/missing-coverart')
+def missing_coverart():
+    """Missing cover art management page"""
+    albums = shared_data.get_no_coverart_cache()
+    
+    # Enrich albums with MBID data from catalog
+    enriched_albums = []
+    for album in albums:
+        catalog_item = shared_data.get_catalog_item(album.get('Barcode'))
+        if catalog_item:
+            album['MBID'] = catalog_item.get('MusicBrainz ID')
+        enriched_albums.append(album)
+    
+    return render_template('missing_coverart.html', albums=enriched_albums)
+
 
 @app.route('/album/<barcode>')
 def album_detail(barcode):
     """Full album details view"""
-    # Find the album in catalog
-    catalog_data = load_catalog()
-    album = None
-    for item in catalog_data:
-        if item.get('Barcode') == barcode:
-            album = item
-            break
+    # Find the album in catalog (using shared data)
+    album = shared_data.get_catalog_item(barcode)
     
     if not album:
         return "Album not found", 404

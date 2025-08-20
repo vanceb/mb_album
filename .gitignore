@@ -10,6 +10,12 @@ spotify_token.json
 # Data Files
 catalog.csv
 barcode_tracks.json
+manual_barcode.csv
+no_coverart.csv
+barcode_queue.db
+
+# Shared data directory with runtime files
+shared_data/
 
 # Directory containing coverart
 coverart        

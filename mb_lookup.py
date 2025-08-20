@@ -12,8 +12,13 @@ import socketserver
 import urllib.parse
 
 from spotify_secret import get_spotify_credentials
+from version import VERSION
 
 TOKEN_FILE = 'spotify_token.json'
+
+# User agent configuration
+REPO_NAME = "musicbrainz-barcode-lookup"
+CONTACT = "vance@axxe.co.uk"
 
 def save_token_info(token_info):
     """
@@ -125,7 +130,7 @@ def lookup_album_by_barcode(barcode):
     :return: Tuple containing album title and artist name, or (None, None) if not found
     """
     print(f"Looking up album by barcode: {barcode}")
-    musicbrainzngs.set_useragent("Album_Lookup", "1.0", "vance@axxe.co.uk")
+    musicbrainzngs.set_useragent(REPO_NAME, VERSION, CONTACT)
     
     try:
         result = musicbrainzngs.search_releases(barcode=barcode)
@@ -209,7 +214,7 @@ def lookup_and_append_to_csv(barcode, filename):
     :param filename: The name of the CSV file to append the results to
     """
     # Perform MusicBrainz lookup
-    musicbrainzngs.set_useragent("Album_Lookup", "1.0", "vance@axxe.co.uk")
+    musicbrainzngs.set_useragent(REPO_NAME, VERSION, CONTACT)
     try:
         result = musicbrainzngs.search_releases(barcode=barcode)
         if result['release-list']:
