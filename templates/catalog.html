@@ -10,9 +10,17 @@
         <h2 style="margin: 0;">Album Catalog</h2>
         <p style="margin: 0.5rem 0;">{{ catalog|length }} albums in catalog. Click on any item to view full details.</p>
     </div>
-    <div>
-        <button id="list-view-btn" class="view-btn active" onclick="showListView()"><i class="fas fa-list"></i> List View</button>
-        <button id="grid-view-btn" class="view-btn" onclick="showGridView()"><i class="fas fa-th"></i> Album Art View</button>
+    <div style="display: flex; gap: 1rem; align-items: center;">
+        <div>
+            <button id="list-view-btn" class="view-btn active" onclick="showListView()"><i class="fas fa-list"></i> List View</button>
+            <button id="grid-view-btn" class="view-btn" onclick="showGridView()"><i class="fas fa-th"></i> Album Art View</button>
+            <button id="artist-view-btn" class="view-btn" onclick="showArtistView()"><i class="fas fa-users"></i> Artist View</button>
+        </div>
+        <div>
+            <span id="starred-filter-btn" onclick="toggleStarredFilter()" style="cursor: pointer; padding: 0.75rem; border-radius: 4px; border: 1px solid #ddd; background-color: white; transition: all 0.2s; display: inline-block;">
+                <i id="starred-filter-icon" class="far fa-star" style="color: #ccc; font-size: 1.3rem;"></i>
+            </span>
+        </div>
     </div>
 </div>
 
@@ -22,6 +30,7 @@
     <table class="table">
         <thead>
             <tr>
+                <th style="width: 30px;"></th>
                 <th style="width: 60px;"></th>
                 <th>Artist</th>
                 <th>Album</th>
@@ -31,7 +40,14 @@
         </thead>
         <tbody>
             {% for album in catalog %}
-            <tr class="clickable" onclick="window.location.href='{{ url_for('album_detail', barcode=album.Barcode) }}'">
+            <tr class="clickable album-row" data-starred="{{ 'true' if album.Barcode in starred_albums else 'false' }}" onclick="window.location.href='{{ url_for('album_detail', barcode=album.Barcode) }}'">
+                <td style="padding: 4px; text-align: center;">
+                    <span class="star-icon" 
+                          onclick="event.stopPropagation(); toggleAlbumStar('{{ album.Barcode }}', this)"
+                          style="cursor: pointer; font-size: 1.2rem; color: {% if album.Barcode in starred_albums %}#ffc107{% else %}#ccc{% endif %};">
+                        <i class="{% if album.Barcode in starred_albums %}fas{% else %}far{% endif %} fa-star"></i>
+                    </span>
+                </td>
                 <td style="padding: 4px;">
                     {% set cover_path = 'coverart/' + album.Barcode + '.jpg' %}
                     <img src="{{ url_for('static', filename=cover_path) }}" 
@@ -56,15 +72,20 @@
 <div id="grid-view" style="display: none;">
     <div class="album-grid">
         {% for album in catalog %}
-        <div class="album-card clickable" onclick="window.location.href='{{ url_for('album_detail', barcode=album.Barcode) }}'">
+        <div class="album-card clickable album-card-item" data-starred="{{ 'true' if album.Barcode in starred_albums else 'false' }}" onclick="window.location.href='{{ url_for('album_detail', barcode=album.Barcode) }}'">
             {% set cover_path = 'coverart/' + album.Barcode + '.jpg' %}
-            <div class="album-cover">
+            <div class="album-cover" style="position: relative;">
                 <img src="{{ url_for('static', filename=cover_path) }}" 
                      alt="Album cover" 
                      onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                 <div class="no-cover-placeholder" style="display: none;">
                     <span>No Cover</span>
                 </div>
+                <span class="star-icon" 
+                      onclick="event.stopPropagation(); toggleAlbumStar('{{ album.Barcode }}', this)"
+                      style="position: absolute; top: 8px; right: 8px; cursor: pointer; font-size: 1.4rem; color: {% if album.Barcode in starred_albums %}#ffc107{% else %}#ccc{% endif %}; text-shadow: 0 0 4px rgba(0,0,0,0.5);">
+                    <i class="{% if album.Barcode in starred_albums %}fas{% else %}far{% endif %} fa-star"></i>
+                </span>
             </div>
             <div class="album-info">
                 <div class="album-title">{{ album['Album/Release'] or 'Unknown Album' }}</div>
@@ -81,6 +102,34 @@
         {% endfor %}
     </div>
 </div>
+
+<!-- Artist View -->
+<div id="artist-view" style="display: none;">
+    <div class="artists-container">
+        <div class="artists-sidebar">
+            <h3><i class="fas fa-users"></i> Artists (<span id="artist-count">0</span>)</h3>
+            <ul class="artist-list" id="artist-list">
+                <!-- Artists will be populated by JavaScript -->
+            </ul>
+        </div>
+        
+        <div class="albums-content">
+            <div class="albums-header">
+                <h2 id="selected-artist-name">Select an Artist</h2>
+                <div class="albums-info" id="albums-info">
+                    Choose an artist from the sidebar to view their albums
+                </div>
+            </div>
+            
+            <div id="albums-display">
+                <div class="empty-state">
+                    <i class="fas fa-music"></i>
+                    <p>Select an artist from the sidebar to view their albums sorted by original release date.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% else %}
 <div class="alert alert-warning">
     No albums in catalog yet. <a href="{{ url_for('index') }}">Start scanning barcodes</a> to build your catalog.
@@ -90,30 +139,405 @@
 
 {% block scripts %}
 <script>
+// Global variables for artist view
+let catalogData = {{ catalog|tojson }};
+let starredAlbumsSet = new Set({{ starred_albums|list|tojson }});
+let artistsData = {};
+let selectedArtist = null;
+
 function showListView() {
     document.getElementById('list-view').style.display = 'block';
     document.getElementById('grid-view').style.display = 'none';
+    document.getElementById('artist-view').style.display = 'none';
     document.getElementById('list-view-btn').classList.add('active');
     document.getElementById('grid-view-btn').classList.remove('active');
+    document.getElementById('artist-view-btn').classList.remove('active');
     localStorage.setItem('catalog-view', 'list');
+    updateAlbumCount();
 }
 
 function showGridView() {
     document.getElementById('list-view').style.display = 'none';
     document.getElementById('grid-view').style.display = 'block';
+    document.getElementById('artist-view').style.display = 'none';
     document.getElementById('list-view-btn').classList.remove('active');
     document.getElementById('grid-view-btn').classList.add('active');
+    document.getElementById('artist-view-btn').classList.remove('active');
     localStorage.setItem('catalog-view', 'grid');
+    updateAlbumCount();
 }
 
-// Remember user's view preference
+function showArtistView() {
+    document.getElementById('list-view').style.display = 'none';
+    document.getElementById('grid-view').style.display = 'none';
+    document.getElementById('artist-view').style.display = 'block';
+    document.getElementById('list-view-btn').classList.remove('active');
+    document.getElementById('grid-view-btn').classList.remove('active');
+    document.getElementById('artist-view-btn').classList.add('active');
+    localStorage.setItem('catalog-view', 'artist');
+    
+    // Initialize artist data if not already done
+    if (Object.keys(artistsData).length === 0) {
+        initializeArtistData();
+    }
+    
+    // Restore selected artist if available
+    const savedArtist = localStorage.getItem('catalog-selected-artist');
+    if (savedArtist && artistsData[savedArtist]) {
+        selectArtist(savedArtist);
+    }
+    
+    updateAlbumCount();
+}
+
+// Initialize artist data
+function initializeArtistData() {
+    artistsData = {};
+    
+    catalogData.forEach(album => {
+        const artist = album.Artist || 'Unknown Artist';
+        
+        if (!artistsData[artist]) {
+            artistsData[artist] = [];
+        }
+        
+        // Add starred status to album
+        album.isStarred = starredAlbumsSet.has(album.Barcode);
+        artistsData[artist].push(album);
+    });
+    
+    // Sort albums within each artist by original release date
+    Object.keys(artistsData).forEach(artist => {
+        artistsData[artist].sort((a, b) => {
+            const dateA = a['First Release'] || '9999-99-99';
+            const dateB = b['First Release'] || '9999-99-99';
+            return dateA.localeCompare(dateB);
+        });
+    });
+    
+    renderArtistsList();
+}
+
+// Render artists list in sidebar
+function renderArtistsList() {
+    const artistList = document.getElementById('artist-list');
+    const artistCount = document.getElementById('artist-count');
+    
+    if (!artistList || !artistCount) return;
+    
+    const sortedArtists = Object.keys(artistsData).sort();
+    artistCount.textContent = sortedArtists.length;
+    
+    artistList.innerHTML = '';
+    
+    sortedArtists.forEach(artist => {
+        const li = document.createElement('li');
+        li.className = 'artist-item';
+        li.dataset.artist = artist;
+        li.onclick = () => selectArtist(artist);
+        
+        const albumCount = artistsData[artist].length;
+        li.innerHTML = `
+            <span class="artist-name">${artist}</span>
+            <span class="album-count">${albumCount}</span>
+        `;
+        
+        artistList.appendChild(li);
+    });
+}
+
+// Select an artist and display their albums
+function selectArtist(artist) {
+    selectedArtist = artist;
+    
+    // Update sidebar selection
+    document.querySelectorAll('.artist-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    const artistItem = document.querySelector(`[data-artist="${CSS.escape(artist)}"]`);
+    if (artistItem) {
+        artistItem.classList.add('active');
+    }
+    
+    // Update header
+    const artistNameElement = document.getElementById('selected-artist-name');
+    const albumsInfoElement = document.getElementById('albums-info');
+    
+    if (artistNameElement && albumsInfoElement) {
+        artistNameElement.textContent = artist;
+        const albumCount = artistsData[artist].length;
+        albumsInfoElement.textContent = `${albumCount} album${albumCount !== 1 ? 's' : ''} • Sorted by original release date`;
+    }
+    
+    // Save selected artist to localStorage
+    localStorage.setItem('catalog-selected-artist', artist);
+    
+    // Render albums
+    renderArtistAlbums(artistsData[artist]);
+}
+
+// Render albums for selected artist
+function renderArtistAlbums(albums) {
+    const albumsDisplay = document.getElementById('albums-display');
+    if (!albumsDisplay) return;
+    
+    if (albums.length === 0) {
+        albumsDisplay.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-compact-disc"></i>
+                <p>No albums found for this artist.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    const albumsGrid = document.createElement('div');
+    albumsGrid.className = 'albums-grid';
+    
+    albums.forEach(album => {
+        const albumCard = document.createElement('div');
+        albumCard.className = 'album-card';
+        albumCard.onclick = () => window.location.href = `/album/${album.Barcode}`;
+        
+        const coverPath = `coverart/${album.Barcode}.jpg`;
+        const year = album['First Release'] ? 
+            (album['First Release'].length >= 4 ? album['First Release'].substring(0, 4) : album['First Release']) : 
+            'Unknown Year';
+        
+        albumCard.innerHTML = `
+            <div class="album-cover" style="position: relative;">
+                <img src="/static/${coverPath}" 
+                     alt="Album cover" 
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                <div class="no-cover-placeholder" style="display: none;">
+                    <span>No Cover</span>
+                </div>
+                <span class="star-icon" 
+                      onclick="event.stopPropagation(); toggleAlbumStarInArtistView('${album.Barcode}', this)"
+                      style="position: absolute; top: 8px; right: 8px; cursor: pointer; font-size: 1.4rem; color: ${album.isStarred ? '#ffc107' : '#ccc'}; text-shadow: 0 0 4px rgba(0,0,0,0.5);">
+                    <i class="${album.isStarred ? 'fas' : 'far'} fa-star"></i>
+                </span>
+            </div>
+            <div class="album-info">
+                <div class="album-title">${album['Album/Release'] || 'Unknown Album'}</div>
+                <div class="album-artist">${album.Artist || 'Unknown Artist'}</div>
+                <div class="album-year">${year}</div>
+            </div>
+        `;
+        
+        albumsGrid.appendChild(albumCard);
+    });
+    
+    albumsDisplay.innerHTML = '';
+    albumsDisplay.appendChild(albumsGrid);
+}
+
+// Toggle album star in artist view
+async function toggleAlbumStarInArtistView(barcode, starElement) {
+    const starIcon = starElement.querySelector('i');
+    const isStarred = starIcon.classList.contains('fas');
+    
+    try {
+        starElement.style.pointerEvents = 'none';
+        
+        const endpoint = isStarred ? `/unstar-album/${barcode}` : `/star-album/${barcode}`;
+        const response = await fetch(endpoint, { method: 'POST' });
+        const data = await response.json();
+        
+        if (data.success) {
+            // Toggle star appearance
+            if (isStarred) {
+                starIcon.classList.remove('fas');
+                starIcon.classList.add('far');
+                starElement.style.color = '#ccc';
+                starredAlbumsSet.delete(barcode);
+            } else {
+                starIcon.classList.remove('far');
+                starIcon.classList.add('fas');
+                starElement.style.color = '#ffc107';
+                starredAlbumsSet.add(barcode);
+            }
+            
+            // Update the album data
+            const album = catalogData.find(a => a.Barcode === barcode);
+            if (album) {
+                album.isStarred = !isStarred;
+                
+                // Update in artistsData too
+                if (artistsData[album.Artist]) {
+                    const artistAlbum = artistsData[album.Artist].find(a => a.Barcode === barcode);
+                    if (artistAlbum) {
+                        artistAlbum.isStarred = !isStarred;
+                    }
+                }
+            }
+        } else {
+            alert(`Error: ${data.error || 'Unknown error'}`);
+        }
+    } catch (error) {
+        console.error('Error toggling album star:', error);
+        alert('Error toggling album star. Please try again.');
+    } finally {
+        starElement.style.pointerEvents = 'auto';
+    }
+}
+
+// Remember user's view and filter preferences
 window.onload = function() {
     const savedView = localStorage.getItem('catalog-view');
     if (savedView === 'grid') {
         showGridView();
+    } else if (savedView === 'artist') {
+        showArtistView();
     } else {
         showListView();
     }
+    
+    // Restore filter state
+    const savedFilter = localStorage.getItem('catalog-starred-filter');
+    if (savedFilter === 'true') {
+        const filterBtn = document.getElementById('starred-filter-btn');
+        const filterIcon = document.getElementById('starred-filter-icon');
+        filterIcon.classList.remove('far');
+        filterIcon.classList.add('fas');
+        filterIcon.style.color = '#ffc107';
+        filterBtn.style.backgroundColor = '#fff3cd';
+        filterBtn.style.borderColor = '#ffc107';
+        
+        // Apply the filter
+        const albumRows = document.querySelectorAll('.album-row');
+        albumRows.forEach(row => {
+            const isStarred = row.getAttribute('data-starred') === 'true';
+            row.style.display = isStarred ? '' : 'none';
+        });
+        
+        const albumCards = document.querySelectorAll('.album-card-item');
+        albumCards.forEach(card => {
+            const isStarred = card.getAttribute('data-starred') === 'true';
+            card.style.display = isStarred ? '' : 'none';
+        });
+        
+        updateAlbumCount();
+    }
 };
+
+async function toggleAlbumStar(barcode, starElement) {
+    const starIcon = starElement.querySelector('i');
+    const isStarred = starIcon.classList.contains('fas');
+    
+    try {
+        // Disable clicking during request
+        starElement.style.pointerEvents = 'none';
+        
+        const endpoint = isStarred ? `/unstar-album/${barcode}` : `/star-album/${barcode}`;
+        const response = await fetch(endpoint, { method: 'POST' });
+        const data = await response.json();
+        
+        if (data.success) {
+            // Toggle star appearance
+            if (isStarred) {
+                starIcon.classList.remove('fas');
+                starIcon.classList.add('far');
+                starElement.style.color = '#ccc';
+            } else {
+                starIcon.classList.remove('far');
+                starIcon.classList.add('fas');
+                starElement.style.color = '#ffc107';
+            }
+            
+            // Update data attributes for filtering
+            const newStarredState = isStarred ? 'false' : 'true';
+            const albumRow = starElement.closest('.album-row');
+            if (albumRow) {
+                albumRow.setAttribute('data-starred', newStarredState);
+            }
+            const albumCard = starElement.closest('.album-card-item');
+            if (albumCard) {
+                albumCard.setAttribute('data-starred', newStarredState);
+            }
+            
+            // Apply current filter if active
+            const filterIcon = document.getElementById('starred-filter-icon');
+            if (filterIcon && filterIcon.classList.contains('fas')) {
+                toggleStarredFilter();
+            }
+            
+            updateAlbumCount();
+        } else {
+            alert(`Error: ${data.error || 'Unknown error'}`);
+        }
+    } catch (error) {
+        console.error('Error toggling album star:', error);
+        alert('Error toggling album star. Please try again.');
+    } finally {
+        // Re-enable clicking
+        starElement.style.pointerEvents = 'auto';
+    }
+}
+
+function toggleStarredFilter() {
+    const filterBtn = document.getElementById('starred-filter-btn');
+    const filterIcon = document.getElementById('starred-filter-icon');
+    const isCurrentlyActive = filterIcon.classList.contains('fas');
+    const showStarredOnly = !isCurrentlyActive;
+    
+    // Toggle star appearance
+    if (showStarredOnly) {
+        filterIcon.classList.remove('far');
+        filterIcon.classList.add('fas');
+        filterIcon.style.color = '#ffc107';
+        filterBtn.style.backgroundColor = '#fff3cd';
+        filterBtn.style.borderColor = '#ffc107';
+    } else {
+        filterIcon.classList.remove('fas');
+        filterIcon.classList.add('far');
+        filterIcon.style.color = '#ccc';
+        filterBtn.style.backgroundColor = 'white';
+        filterBtn.style.borderColor = '#ddd';
+    }
+    
+    // Filter table rows (list view)
+    const albumRows = document.querySelectorAll('.album-row');
+    albumRows.forEach(row => {
+        const isStarred = row.getAttribute('data-starred') === 'true';
+        row.style.display = showStarredOnly ? (isStarred ? '' : 'none') : '';
+    });
+    
+    // Filter album cards (grid view)
+    const albumCards = document.querySelectorAll('.album-card-item');
+    albumCards.forEach(card => {
+        const isStarred = card.getAttribute('data-starred') === 'true';
+        card.style.display = showStarredOnly ? (isStarred ? '' : 'none') : '';
+    });
+    
+    // Update count display
+    updateAlbumCount();
+    
+    // Remember filter state
+    localStorage.setItem('catalog-starred-filter', showStarredOnly);
+}
+
+function updateAlbumCount() {
+    const filterIcon = document.getElementById('starred-filter-icon');
+    const showStarredOnly = filterIcon.classList.contains('fas');
+    
+    let visibleCount;
+    if (document.getElementById('list-view').style.display !== 'none') {
+        // Count visible rows
+        const visibleRows = document.querySelectorAll('.album-row:not([style*="display: none"])');
+        visibleCount = visibleRows.length;
+    } else {
+        // Count visible cards
+        const visibleCards = document.querySelectorAll('.album-card-item:not([style*="display: none"])');
+        visibleCount = visibleCards.length;
+    }
+    
+    const countElement = document.querySelector('h2 + p');
+    if (showStarredOnly) {
+        countElement.textContent = `${visibleCount} starred albums shown. Click on any item to view full details.`;
+    } else {
+        countElement.textContent = `{{ catalog|length }} albums in catalog. Click on any item to view full details.`;
+    }
+}
 </script>
 {% endblock %}

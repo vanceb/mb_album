@@ -12,6 +12,7 @@ CATALOG_FILE = 'catalog.csv'
 CONFIG_FILE = 'csv_fields.json'
 TRACKS_CACHE_FILE = 'barcode_tracks.json'
 STARRED_FILE = 'starred.csv'
+STARRED_ALBUMS_FILE = 'starred_albums.csv'
 
 # Start background worker on app startup (lazy initialization)
 def startup():
@@ -192,6 +193,90 @@ def unstar_track(barcode, track_number):
         if not starred_tracks[barcode]:  # Remove barcode if no tracks left
             del starred_tracks[barcode]
         save_starred_tracks(starred_tracks)
+
+def load_starred_albums():
+    """Load starred albums from CSV file"""
+    starred_albums = set()
+    if os.path.exists(STARRED_ALBUMS_FILE):
+        try:
+            with open(STARRED_ALBUMS_FILE, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    barcode = row.get('Barcode')
+                    if barcode:
+                        starred_albums.add(barcode)
+        except Exception as e:
+            print(f"Error loading starred albums: {e}")
+    return starred_albums
+
+def save_starred_albums(starred_albums):
+    """Save starred albums to CSV file"""
+    try:
+        with open(STARRED_ALBUMS_FILE, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerow(['Barcode'])
+            for barcode in starred_albums:
+                writer.writerow([barcode])
+        print(f"Saved {len(starred_albums)} starred albums")
+    except Exception as e:
+        print(f"Error saving starred albums: {e}")
+
+def is_album_starred(barcode):
+    """Check if an album is starred"""
+    starred_albums = load_starred_albums()
+    return barcode in starred_albums
+
+def star_album(barcode):
+    """Star an album"""
+    starred_albums = load_starred_albums()
+    starred_albums.add(barcode)
+    save_starred_albums(starred_albums)
+
+def unstar_album(barcode):
+    """Unstar an album"""
+    starred_albums = load_starred_albums()
+    if barcode in starred_albums:
+        starred_albums.remove(barcode)
+        save_starred_albums(starred_albums)
+
+def get_enriched_starred_tracks():
+    """Get starred tracks with full album and track information"""
+    starred_tracks = load_starred_tracks()
+    enriched_tracks = []
+    
+    for barcode, track_numbers in starred_tracks.items():
+        # Get album information from catalog
+        album = shared_data.get_catalog_item(barcode)
+        if not album:
+            continue
+            
+        # Get track listing for this album
+        mbid = album.get('MusicBrainz ID')
+        tracks = get_tracks(barcode, mbid)
+        
+        # Get cover art URL
+        cover_url = f"/static/coverart/{barcode}.jpg" if os.path.exists(f"static/coverart/{barcode}.jpg") else None
+        
+        for track_number in track_numbers:
+            try:
+                track_index = int(track_number) - 1
+                if 0 <= track_index < len(tracks):
+                    track_name = tracks[track_index]
+                    enriched_tracks.append({
+                        'barcode': barcode,
+                        'track_number': track_number,
+                        'track_name': track_name,
+                        'artist': album.get('Artist', 'Unknown Artist'),
+                        'album': album.get('Album/Release', 'Unknown Album'),
+                        'cover_url': cover_url,
+                        'year': album.get('First Release', '').split('-')[0] if album.get('First Release') else 'Unknown'
+                    })
+            except (ValueError, IndexError):
+                continue
+    
+    # Sort by artist, then album, then track number
+    enriched_tracks.sort(key=lambda x: (x['artist'], x['album'], int(x['track_number'])))
+    return enriched_tracks
 
 @app.route('/')
 def index():
@@ -384,7 +469,8 @@ def retry_coverart(barcode):
 def catalog():
     """Catalog review page"""
     catalog_data = shared_data.get_catalog_cache()
-    return render_template('catalog.html', catalog=catalog_data)
+    starred_albums = load_starred_albums()
+    return render_template('catalog.html', catalog=catalog_data, starred_albums=starred_albums)
 
 @app.route('/missing-coverart')
 def missing_coverart():
@@ -400,6 +486,12 @@ def missing_coverart():
         enriched_albums.append(album)
     
     return render_template('missing_coverart.html', albums=enriched_albums)
+
+@app.route('/starred-tracks')
+def starred_tracks():
+    """Starred tracks page"""
+    starred_tracks = get_enriched_starred_tracks()
+    return render_template('starred_tracks.html', starred_tracks=starred_tracks)
 
 @app.route('/star/<barcode>/<track_number>', methods=['POST'])
 def star_track_endpoint(barcode, track_number):
@@ -438,7 +530,30 @@ def album_detail(barcode):
     starred_tracks = load_starred_tracks()
     starred_set = starred_tracks.get(barcode, set())
     
-    return render_template('album_detail.html', album=album, tracks=tracks, starred_tracks=starred_set)
+    # Get starred albums
+    starred_albums = load_starred_albums()
+    
+    return render_template('album_detail.html', album=album, tracks=tracks, starred_tracks=starred_set, starred_albums=starred_albums)
+
+@app.route('/star-album/<barcode>', methods=['POST'])
+def star_album_endpoint(barcode):
+    """Star an album"""
+    try:
+        star_album(barcode)
+        return jsonify({'success': True, 'message': f'Starred album'})
+    except Exception as e:
+        print(f"Error starring album {barcode}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/unstar-album/<barcode>', methods=['POST'])
+def unstar_album_endpoint(barcode):
+    """Unstar an album"""
+    try:
+        unstar_album(barcode)
+        return jsonify({'success': True, 'message': f'Unstarred album'})
+    except Exception as e:
+        print(f"Error unstarring album {barcode}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

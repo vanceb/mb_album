@@ -23,59 +23,88 @@
             justify-content: space-between;
             align-items: center;
         }
-        .hamburger {
+        .navbar {
             display: flex;
-            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .navbar a {
+            color: white;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+            font-weight: 500;
+        }
+        
+        .navbar a:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        .dropdown {
+            position: relative;
+        }
+        
+        .dropdown-toggle {
             cursor: pointer;
-            padding: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
-        .hamburger span {
-            width: 25px;
-            height: 3px;
-            background-color: white;
-            margin: 3px 0;
-            transition: 0.3s;
-        }
-        .hamburger.active span:nth-child(1) {
-            transform: rotate(-45deg) translate(-5px, 6px);
-        }
-        .hamburger.active span:nth-child(2) {
-            opacity: 0;
-        }
-        .hamburger.active span:nth-child(3) {
-            transform: rotate(45deg) translate(-5px, -6px);
-        }
-        .nav {
+        
+        .dropdown-menu {
             display: none;
             position: absolute;
             top: 100%;
             right: 0;
-            background-color: #333;
-            flex-direction: column;
-            padding: 1rem;
-            border-radius: 0 0 8px 8px;
-            z-index: 1000;
+            background-color: #444;
             min-width: 200px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-        }
-        .nav.active {
-            display: flex;
-        }
-        .nav a {
-            color: white;
-            text-decoration: none;
-            padding: 0.75rem 1rem;
-            border: 1px solid #555;
             border-radius: 4px;
-            background-color: transparent;
-            margin: 0.25rem 0;
-            transition: background-color 0.2s;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 1000;
+            margin-top: 0.5rem;
         }
-        .nav a:hover {
+        
+        .dropdown.active .dropdown-menu {
+            display: block;
+        }
+        
+        .dropdown-menu a {
+            display: block;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #555;
+            margin: 0;
+            border-radius: 0;
+        }
+        
+        .dropdown-menu a:last-child {
+            border-bottom: none;
+        }
+        
+        .dropdown-menu a:first-child {
+            border-radius: 4px 4px 0 0;
+        }
+        
+        .dropdown-menu a:last-child {
+            border-radius: 0 0 4px 4px;
+        }
+        
+        .dropdown-menu a:hover {
             background-color: #555;
         }
-        .header {
-            position: relative;
+        
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            .navbar {
+                gap: 1rem;
+                flex-wrap: wrap;
+            }
+            
+            .navbar a {
+                padding: 0.4rem 0.8rem;
+                font-size: 0.9rem;
+            }
         }
         .container {
             background-color: white;
@@ -223,22 +252,151 @@
             color: #888;
             font-size: 0.8rem;
         }
+        
+        /* Artist View Styles */
+        .artists-container {
+            display: flex;
+            gap: 1.5rem;
+            min-height: 600px;
+        }
+        
+        .artists-sidebar {
+            width: 280px;
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: sticky;
+            top: 20px;
+        }
+        
+        .artists-sidebar h3 {
+            margin: 0;
+            padding: 1rem;
+            background-color: #e9ecef;
+            border-bottom: 1px solid #ddd;
+            border-radius: 8px 8px 0 0;
+            font-size: 1.1rem;
+            color: #495057;
+        }
+        
+        .artist-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .artist-item {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .artist-item:hover {
+            background-color: #e9ecef;
+        }
+        
+        .artist-item.active {
+            background-color: #007bff;
+            color: white;
+        }
+        
+        .artist-item.active:hover {
+            background-color: #0056b3;
+        }
+        
+        .album-count {
+            font-size: 0.85em;
+            color: #6c757d;
+            background-color: #e9ecef;
+            padding: 0.2rem 0.5rem;
+            border-radius: 12px;
+            min-width: 20px;
+            text-align: center;
+        }
+        
+        .artist-item.active .album-count {
+            background-color: rgba(255,255,255,0.2);
+            color: white;
+        }
+        
+        .albums-content {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .albums-header {
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid #e9ecef;
+        }
+        
+        .albums-header h2 {
+            margin: 0 0 0.5rem 0;
+            color: #495057;
+        }
+        
+        .albums-info {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+        
+        .albums-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1.5rem;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: #6c757d;
+        }
+        
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            color: #dee2e6;
+        }
+        
+        /* Mobile responsive for artist view */
+        @media (max-width: 768px) {
+            .artists-container {
+                flex-direction: column;
+            }
+            
+            .artists-sidebar {
+                width: 100%;
+                position: static;
+                max-height: 300px;
+                margin-bottom: 1rem;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="header">
         <h1>{% block header %}Album Catalog{% endblock %}</h1>
-        <div class="hamburger" onclick="toggleNav()">
-            <span></span>
-            <span></span>
-            <span></span>
-        </div>
-        <div class="nav" id="nav">
-            <a href="{{ url_for('index') }}"><i class="fas fa-qrcode"></i> Scan Barcodes</a>
-            <a href="{{ url_for('catalog') }}"><i class="fas fa-th-list"></i> View Catalog</a>
-            <a href="{{ url_for('queue_status') }}"><i class="fas fa-cogs"></i> Queue Status</a>
-            <a href="{{ url_for('missing_coverart') }}"><i class="fas fa-image"></i> Missing Cover Art</a>
-        </div>
+        <nav class="navbar">
+            <a href="{{ url_for('catalog') }}"><i class="fas fa-compact-disc"></i> Albums</a>
+            <a href="{{ url_for('starred_tracks') }}"><i class="fas fa-star"></i> Starred Tracks</a>
+            <div class="dropdown" id="admin-dropdown">
+                <div class="dropdown-toggle" onclick="toggleDropdown()">
+                    <i class="fas fa-cog"></i> Admin
+                    <i class="fas fa-chevron-down"></i>
+                </div>
+                <div class="dropdown-menu">
+                    <a href="{{ url_for('index') }}"><i class="fas fa-qrcode"></i> Scan Barcodes</a>
+                    <a href="{{ url_for('queue_status') }}"><i class="fas fa-cogs"></i> Queue Status</a>
+                    <a href="{{ url_for('missing_coverart') }}"><i class="fas fa-image"></i> Missing Cover Art</a>
+                </div>
+            </div>
+        </nav>
     </div>
     
     <div class="container">
@@ -248,33 +406,27 @@
     {% block scripts %}{% endblock %}
     
     <script>
-    function toggleNav() {
-        const nav = document.getElementById('nav');
-        const hamburger = document.querySelector('.hamburger');
-        nav.classList.toggle('active');
-        hamburger.classList.toggle('active');
+    function toggleDropdown() {
+        const dropdown = document.getElementById('admin-dropdown');
+        dropdown.classList.toggle('active');
     }
     
-    // Close nav when clicking a link
-    document.querySelectorAll('.nav a').forEach(link => {
-        link.addEventListener('click', () => {
-            const nav = document.getElementById('nav');
-            const hamburger = document.querySelector('.hamburger');
-            nav.classList.remove('active');
-            hamburger.classList.remove('active');
-        });
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+        const dropdown = document.getElementById('admin-dropdown');
+        const dropdownToggle = dropdown.querySelector('.dropdown-toggle');
+        
+        if (!dropdown.contains(e.target) && dropdown.classList.contains('active')) {
+            dropdown.classList.remove('active');
+        }
     });
     
-    // Close nav when clicking outside
-    document.addEventListener('click', (e) => {
-        const nav = document.getElementById('nav');
-        const hamburger = document.querySelector('.hamburger');
-        const header = document.querySelector('.header');
-        
-        if (!header.contains(e.target) && nav.classList.contains('active')) {
-            nav.classList.remove('active');
-            hamburger.classList.remove('active');
-        }
+    // Close dropdown when clicking a link
+    document.querySelectorAll('.dropdown-menu a').forEach(link => {
+        link.addEventListener('click', () => {
+            const dropdown = document.getElementById('admin-dropdown');
+            dropdown.classList.remove('active');
+        });
     });
     </script>
 </body>

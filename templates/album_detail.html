@@ -2,23 +2,28 @@
 
 {% block title %}{{ album.Artist }} - {{ album['Album/Release'] }}{% endblock %}
 
-{% block header %}{{ album.Artist }} - {{ album['Album/Release'] }} {% if album['First Release'] %}({{ album['First Release'][:4] if album['First Release']|length >= 4 else album['First Release'] }}){% endif %}{% endblock %}
+{% block header %}
+{{ album.Artist }} - {{ album['Album/Release'] }} {% if album['First Release'] %}({{ album['First Release'][:4] if album['First Release']|length >= 4 else album['First Release'] }}){% endif %}
+{% endblock %}
 
 {% block content %}
-<div style="margin-bottom: 1rem;">
-    <a href="{{ url_for('catalog') }}"><i class="fas fa-arrow-left"></i> Back to Catalog</a>
-</div>
-
 <div style="display: flex; gap: 2rem; align-items: flex-start;">
     <!-- Left Column: Cover Art + Metadata -->
     <div style="flex-shrink: 0; width: 300px;">
-        {% set cover_path = 'coverart/' + album.Barcode + '.jpg' %}
-        <img src="{{ url_for('static', filename=cover_path) }}" 
-             alt="Album cover" 
-             style="width: 300px; height: 300px; object-fit: cover; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.2);"
-             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-        <div style="display: none; width: 300px; height: 300px; background-color: #f0f0f0; border: 2px dashed #ccc; border-radius: 8px; align-items: center; justify-content: center; color: #666;">
-            No Cover Art
+        <div style="position: relative; width: 300px; height: 300px;">
+            {% set cover_path = 'coverart/' + album.Barcode + '.jpg' %}
+            <img src="{{ url_for('static', filename=cover_path) }}" 
+                 alt="Album cover" 
+                 style="width: 300px; height: 300px; object-fit: cover; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.2);"
+                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+            <div style="display: none; width: 300px; height: 300px; background-color: #f0f0f0; border: 2px dashed #ccc; border-radius: 8px; align-items: center; justify-content: center; color: #666;">
+                No Cover Art
+            </div>
+            <span class="star-icon" 
+                  onclick="toggleAlbumStar('{{ album.Barcode }}', this)"
+                  style="position: absolute; top: 8px; right: 8px; cursor: pointer; font-size: 1.4rem; color: {% if album.Barcode in starred_albums %}#ffc107{% else %}#ccc{% endif %}; text-shadow: 0 0 4px rgba(0,0,0,0.5);">
+                <i class="{% if album.Barcode in starred_albums %}fas{% else %}far{% endif %} fa-star"></i>
+            </span>
         </div>
         
         <!-- Metadata Dropdown -->
@@ -127,6 +132,41 @@ async function toggleStar(barcode, trackNumber, starElement) {
     } catch (error) {
         console.error('Error toggling star:', error);
         alert('Error toggling star. Please try again.');
+    } finally {
+        // Re-enable clicking
+        starElement.style.pointerEvents = 'auto';
+    }
+}
+
+async function toggleAlbumStar(barcode, starElement) {
+    const starIcon = starElement.querySelector('i');
+    const isStarred = starIcon.classList.contains('fas');
+    
+    try {
+        // Disable clicking during request
+        starElement.style.pointerEvents = 'none';
+        
+        const endpoint = isStarred ? `/unstar-album/${barcode}` : `/star-album/${barcode}`;
+        const response = await fetch(endpoint, { method: 'POST' });
+        const data = await response.json();
+        
+        if (data.success) {
+            // Toggle star appearance
+            if (isStarred) {
+                starIcon.classList.remove('fas');
+                starIcon.classList.add('far');
+                starElement.style.color = '#ccc';
+            } else {
+                starIcon.classList.remove('far');
+                starIcon.classList.add('fas');
+                starElement.style.color = '#ffc107';
+            }
+        } else {
+            alert(`Error: ${data.error || 'Unknown error'}`);
+        }
+    } catch (error) {
+        console.error('Error toggling album star:', error);
+        alert('Error toggling album star. Please try again.');
     } finally {
         // Re-enable clicking
         starElement.style.pointerEvents = 'auto';
