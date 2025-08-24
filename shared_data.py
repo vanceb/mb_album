@@ -213,6 +213,19 @@ class SharedDataManager:
                 json.dump(data, f, indent=2, ensure_ascii=False)
         except IOError as e:
             print(f"Error writing {filepath}: {e}")
+    
+    def get_current_timestamp(self) -> str:
+        """Get current timestamp in ISO format"""
+        return datetime.now().isoformat()
+    
+    def force_refresh_catalog(self):
+        """Force refresh catalog by deleting cache (next worker cycle will rebuild)"""
+        try:
+            if os.path.exists(self.catalog_cache_file):
+                os.remove(self.catalog_cache_file)
+                print("Catalog cache deleted, worker will rebuild on next cycle")
+        except Exception as e:
+            print(f"Error forcing catalog refresh: {e}")
 
 # Global instance
 shared_data = SharedDataManager()

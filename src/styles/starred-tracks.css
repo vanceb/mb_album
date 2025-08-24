@@ -1,0 +1,279 @@
+/* Starred Tracks Component Styles */
+
+.starred-tracks-page {
+  min-height: 100vh;
+  background-color: white;
+}
+
+.page-header {
+  background-color: #343a40;
+  color: white;
+  padding: 1rem 0;
+  margin-bottom: 2rem;
+}
+
+.page-header-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.back-button {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.back-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  transform: translateX(-2px);
+}
+
+.page-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+/* No starred tracks state */
+.no-starred-tracks {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+}
+
+.no-content-message {
+  text-align: center;
+  color: #6c757d;
+}
+
+.no-content-message i {
+  color: #dee2e6;
+  margin-bottom: 1rem;
+}
+
+.no-content-message h3 {
+  color: #495057;
+  margin-bottom: 0.5rem;
+}
+
+.no-content-message p {
+  margin-bottom: 2rem;
+}
+
+/* Starred tracks list */
+.starred-tracks-list {
+  margin-top: 1rem;
+}
+
+.starred-tracks-count {
+  margin-bottom: 1rem;
+  color: #6c757d;
+  font-size: 0.9rem;
+}
+
+/* Track star button styling */
+.track-star-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: all 0.2s;
+  color: #ffc107;
+}
+
+.track-star-button:hover {
+  transform: scale(1.1);
+}
+
+.track-star-button.starred {
+  color: #ffc107;
+}
+
+.track-star-button.starred:hover {
+  color: #e0a800;
+}
+
+/* Table styling */
+.starred-tracks-list .table {
+  background-color: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.starred-tracks-list .table th {
+  background-color: #f8f9fa;
+  border-bottom: 2px solid #dee2e6;
+  font-weight: 600;
+  color: #495057;
+  padding: 1rem 0.75rem;
+}
+
+.starred-tracks-list .table td {
+  padding: 0.75rem;
+  vertical-align: middle;
+  border-top: 1px solid #dee2e6;
+}
+
+.starred-tracks-list .table-hover tbody tr:hover {
+  background-color: rgba(0, 123, 255, 0.05);
+}
+
+/* Album thumbnail styling */
+.album-thumbnail-container {
+  width: 48px;
+  height: 48px;
+  cursor: pointer;
+  border-radius: 4px;
+  overflow: hidden;
+  transition: all 0.2s;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.album-thumbnail-container:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.album-thumbnail {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.album-thumbnail-placeholder {
+  width: 100%;
+  height: 100%;
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  color: #6c757d;
+  font-size: 1.2rem;
+}
+
+/* Track info styling */
+.track-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.track-name {
+  font-weight: 600;
+  font-size: 1rem;
+  color: #212529;
+  margin-bottom: 0.25rem;
+  line-height: 1.2;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.track-number {
+  font-size: 0.8rem;
+  color: #6c757d;
+  font-weight: 400;
+}
+
+/* Cell styling for consistent spacing */
+.artist-cell, .album-cell {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-width: 0;
+}
+
+/* Button styling */
+.btn {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.btn-primary {
+  background-color: #007bff;
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: #0056b3;
+}
+
+.btn-sm {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8rem;
+}
+
+.btn-outline-primary {
+  background-color: transparent;
+  color: #007bff;
+  border: 1px solid #007bff;
+}
+
+.btn-outline-primary:hover {
+  background-color: #007bff;
+  color: white;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .page-header-content {
+    padding: 0 1rem;
+  }
+  
+  .page-header h2 {
+    font-size: 1.3rem;
+  }
+  
+  .starred-tracks-list .table th,
+  .starred-tracks-list .table td {
+    padding: 0.5rem 0.25rem;
+    font-size: 0.9rem;
+  }
+  
+  .album-thumbnail-container {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .track-name {
+    font-size: 0.9rem;
+  }
+  
+  .track-number {
+    font-size: 0.7rem;
+  }
+  
+  .artist-cell, .album-cell {
+    font-size: 0.8rem;
+  }
+  
+  .btn-sm {
+    padding: 0.125rem 0.25rem;
+    font-size: 0.7rem;
+  }
+}

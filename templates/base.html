@@ -383,10 +383,24 @@
     <div class="header">
         <h1>{% block header %}Album Catalog{% endblock %}</h1>
         <nav class="navbar">
-            <a href="{{ url_for('catalog') }}"><i class="fas fa-compact-disc"></i> Albums</a>
+            <a href="/app"><i class="fas fa-compact-disc"></i> Albums</a>
             <a href="{{ url_for('starred_tracks') }}"><i class="fas fa-star"></i> Starred Tracks</a>
+            <div class="dropdown" id="user-dropdown">
+                <div class="dropdown-toggle" onclick="toggleUserDropdown()">
+                    <i class="fas fa-user"></i> <span id="current-user">Select User</span>
+                    <i class="fas fa-chevron-down"></i>
+                </div>
+                <div class="dropdown-menu">
+                    <div id="user-list">
+                        <!-- Users will be populated by JavaScript -->
+                    </div>
+                    <div style="border-top: 1px solid #555; margin-top: 0.5rem; padding-top: 0.5rem;">
+                        <a href="#" onclick="addNewUser()"><i class="fas fa-plus"></i> Add New User</a>
+                    </div>
+                </div>
+            </div>
             <div class="dropdown" id="admin-dropdown">
-                <div class="dropdown-toggle" onclick="toggleDropdown()">
+                <div class="dropdown-toggle" onclick="toggleAdminDropdown()">
                     <i class="fas fa-cog"></i> Admin
                     <i class="fas fa-chevron-down"></i>
                 </div>
@@ -406,27 +420,163 @@
     {% block scripts %}{% endblock %}
     
     <script>
-    function toggleDropdown() {
-        const dropdown = document.getElementById('admin-dropdown');
+    // User Management Functions
+    function loadUsers() {
+        try {
+            const storage = localStorage.getItem('albumCatalogData');
+            if (storage) {
+                const data = JSON.parse(storage);
+                return {
+                    users: data.users || [],
+                    currentUser: data.currentUser || null,
+                    userData: data.userData || {}
+                };
+            }
+        } catch (e) {
+            console.error('Error loading users:', e);
+        }
+        return { users: [], currentUser: null, userData: {} };
+    }
+    
+    function saveUsers(users, currentUser, userData) {
+        try {
+            const existingData = JSON.parse(localStorage.getItem('albumCatalogData') || '{}');
+            const newData = {
+                ...existingData,
+                users,
+                currentUser,
+                userData
+            };
+            localStorage.setItem('albumCatalogData', JSON.stringify(newData));
+            updateUserDisplay();
+            updateAdminDropdownVisibility();
+        } catch (e) {
+            console.error('Error saving users:', e);
+        }
+    }
+    
+    function updateUserDisplay() {
+        const { users, currentUser } = loadUsers();
+        const currentUserSpan = document.getElementById('current-user');
+        const userList = document.getElementById('user-list');
+        
+        if (currentUser && users.includes(currentUser)) {
+            currentUserSpan.textContent = currentUser;
+        } else {
+            currentUserSpan.textContent = 'Select User';
+        }
+        
+        // Populate user list
+        userList.innerHTML = '';
+        users.forEach(user => {
+            const userItem = document.createElement('a');
+            userItem.href = '#';
+            userItem.innerHTML = `<i class="fas fa-user"></i> ${user}`;
+            userItem.onclick = () => selectUser(user);
+            if (user === currentUser) {
+                userItem.style.fontWeight = 'bold';
+                userItem.style.backgroundColor = '#555';
+            }
+            userList.appendChild(userItem);
+        });
+    }
+    
+    function selectUser(userName) {
+        const { users, userData } = loadUsers();
+        saveUsers(users, userName, userData);
+        closeDropdown('user-dropdown');
+    }
+    
+    function addNewUser() {
+        const userName = prompt('Enter new user name:');
+        if (userName && userName.trim()) {
+            const trimmedName = userName.trim();
+            const { users, currentUser, userData } = loadUsers();
+            
+            if (!users.includes(trimmedName)) {
+                const newUsers = [...users, trimmedName];
+                const newUserData = {
+                    ...userData,
+                    [trimmedName]: {
+                        isAdmin: users.length === 0, // First user is admin
+                        starredAlbums: [],
+                        starredTracks: {},
+                        syncId: 'uuid-' + trimmedName.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now()
+                    }
+                };
+                
+                saveUsers(newUsers, trimmedName, newUserData);
+            } else {
+                alert('User already exists!');
+            }
+        }
+        closeDropdown('user-dropdown');
+    }
+    
+    function updateAdminDropdownVisibility() {
+        const { currentUser, userData } = loadUsers();
+        const adminDropdown = document.getElementById('admin-dropdown');
+        
+        if (currentUser && userData[currentUser] && userData[currentUser].isAdmin) {
+            adminDropdown.style.display = 'block';
+        } else {
+            adminDropdown.style.display = 'none';
+        }
+    }
+    
+    // Dropdown Functions
+    function toggleUserDropdown() {
+        toggleDropdownById('user-dropdown');
+    }
+    
+    function toggleAdminDropdown() {
+        toggleDropdownById('admin-dropdown');
+    }
+    
+    function toggleDropdownById(id) {
+        const dropdown = document.getElementById(id);
         dropdown.classList.toggle('active');
+        
+        // Close other dropdowns
+        document.querySelectorAll('.dropdown').forEach(d => {
+            if (d.id !== id) {
+                d.classList.remove('active');
+            }
+        });
+    }
+    
+    function closeDropdown(id) {
+        const dropdown = document.getElementById(id);
+        dropdown.classList.remove('active');
+    }
+    
+    // Legacy function for backward compatibility
+    function toggleDropdown() {
+        toggleAdminDropdown();
     }
     
     // Close dropdown when clicking outside
     document.addEventListener('click', (e) => {
-        const dropdown = document.getElementById('admin-dropdown');
-        const dropdownToggle = dropdown.querySelector('.dropdown-toggle');
-        
-        if (!dropdown.contains(e.target) && dropdown.classList.contains('active')) {
-            dropdown.classList.remove('active');
+        document.querySelectorAll('.dropdown').forEach(dropdown => {
+            if (!dropdown.contains(e.target) && dropdown.classList.contains('active')) {
+                dropdown.classList.remove('active');
+            }
+        });
+    });
+    
+    // Close dropdown when clicking a link (except user management links)
+    document.addEventListener('click', (e) => {
+        if (e.target.matches('.dropdown-menu a') && !e.target.onclick) {
+            document.querySelectorAll('.dropdown').forEach(dropdown => {
+                dropdown.classList.remove('active');
+            });
         }
     });
     
-    // Close dropdown when clicking a link
-    document.querySelectorAll('.dropdown-menu a').forEach(link => {
-        link.addEventListener('click', () => {
-            const dropdown = document.getElementById('admin-dropdown');
-            dropdown.classList.remove('active');
-        });
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', () => {
+        updateUserDisplay();
+        updateAdminDropdownVisibility();
     });
     </script>
 </body>

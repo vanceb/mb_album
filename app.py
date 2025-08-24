@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for
+from flask import Flask, render_template, render_template_string, request, jsonify, redirect, url_for
 import csv
 import os
 import json
@@ -554,6 +554,231 @@ def unstar_album_endpoint(barcode):
     except Exception as e:
         print(f"Error unstarring album {barcode}: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+# ============================================================================
+# REST API ENDPOINTS FOR REACT SPA
+# ============================================================================
+
+@app.route('/api/catalog', methods=['GET'])
+def api_get_catalog():
+    """API endpoint to get full catalog data"""
+    try:
+        catalog_data = shared_data.get_catalog_cache()
+        return jsonify({
+            'success': True,
+            'catalog': catalog_data,
+            'count': len(catalog_data)
+        })
+    except Exception as e:
+        print(f"Error getting catalog: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/album/<barcode>', methods=['GET'])
+def api_get_album(barcode):
+    """API endpoint to get album details and tracks"""
+    try:
+        # Get album data
+        album = shared_data.get_catalog_item(barcode)
+        if not album:
+            return jsonify({'success': False, 'error': 'Album not found'}), 404
+        
+        # Get tracks
+        mbid = album.get('MusicBrainz ID')
+        tracks = get_tracks(barcode, mbid)
+        
+        # Get starred status for tracks
+        starred_tracks = load_starred_tracks()
+        starred_set = starred_tracks.get(barcode, set())
+        
+        # Get starred status for album
+        starred_albums = load_starred_albums()
+        album_starred = barcode in starred_albums
+        
+        return jsonify({
+            'success': True,
+            'album': album,
+            'tracks': tracks,
+            'starred_tracks': list(starred_set),
+            'album_starred': album_starred
+        })
+    except Exception as e:
+        print(f"Error getting album {barcode}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/starred-albums', methods=['POST'])
+def api_sync_starred_albums():
+    """API endpoint to sync starred albums to server as backup"""
+    try:
+        data = request.get_json()
+        sync_id = data.get('syncId')
+        starred_albums = data.get('starredAlbums', [])
+        
+        if not sync_id:
+            return jsonify({'success': False, 'error': 'syncId required'}), 400
+        
+        # Create backup directory if it doesn't exist
+        backup_dir = 'starred_backups'
+        os.makedirs(backup_dir, exist_ok=True)
+        
+        # Save starred albums backup
+        backup_file = os.path.join(backup_dir, f'{sync_id}_albums.json')
+        with open(backup_file, 'w', encoding='utf-8') as f:
+            json.dump({
+                'syncId': sync_id,
+                'starredAlbums': starred_albums,
+                'lastUpdated': shared_data.get_current_timestamp()
+            }, f, indent=2)
+        
+        return jsonify({
+            'success': True,
+            'message': f'Backed up {len(starred_albums)} starred albums',
+            'syncId': sync_id
+        })
+    except Exception as e:
+        print(f"Error syncing starred albums: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/starred-albums/<sync_id>', methods=['GET'])
+def api_get_starred_albums_backup(sync_id):
+    """API endpoint to get starred albums backup"""
+    try:
+        backup_file = os.path.join('starred_backups', f'{sync_id}_albums.json')
+        
+        if not os.path.exists(backup_file):
+            return jsonify({'success': False, 'error': 'Backup not found'}), 404
+        
+        with open(backup_file, 'r', encoding='utf-8') as f:
+            backup_data = json.load(f)
+        
+        return jsonify({
+            'success': True,
+            'data': backup_data
+        })
+    except Exception as e:
+        print(f"Error getting starred albums backup {sync_id}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/starred-tracks', methods=['POST'])
+def api_sync_starred_tracks():
+    """API endpoint to sync starred tracks to server as backup"""
+    try:
+        data = request.get_json()
+        sync_id = data.get('syncId')
+        starred_tracks = data.get('starredTracks', {})
+        
+        if not sync_id:
+            return jsonify({'success': False, 'error': 'syncId required'}), 400
+        
+        # Create backup directory if it doesn't exist
+        backup_dir = 'starred_backups'
+        os.makedirs(backup_dir, exist_ok=True)
+        
+        # Save starred tracks backup
+        backup_file = os.path.join(backup_dir, f'{sync_id}_tracks.json')
+        with open(backup_file, 'w', encoding='utf-8') as f:
+            json.dump({
+                'syncId': sync_id,
+                'starredTracks': starred_tracks,
+                'lastUpdated': shared_data.get_current_timestamp()
+            }, f, indent=2)
+        
+        return jsonify({
+            'success': True,
+            'message': f'Backed up starred tracks for {len(starred_tracks)} albums',
+            'syncId': sync_id
+        })
+    except Exception as e:
+        print(f"Error syncing starred tracks: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/starred-tracks/<sync_id>', methods=['GET'])
+def api_get_starred_tracks_backup(sync_id):
+    """API endpoint to get starred tracks backup"""
+    try:
+        backup_file = os.path.join('starred_backups', f'{sync_id}_tracks.json')
+        
+        if not os.path.exists(backup_file):
+            return jsonify({'success': False, 'error': 'Backup not found'}), 404
+        
+        with open(backup_file, 'r', encoding='utf-8') as f:
+            backup_data = json.load(f)
+        
+        return jsonify({
+            'success': True,
+            'data': backup_data
+        })
+    except Exception as e:
+        print(f"Error getting starred tracks backup {sync_id}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/catalog/refresh', methods=['POST'])
+def api_refresh_catalog():
+    """API endpoint to force catalog refresh (Admin only - no auth for now)"""
+    try:
+        # Force refresh of catalog cache
+        shared_data.force_refresh_catalog()
+        
+        # Get updated catalog
+        catalog_data = shared_data.get_catalog_cache()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Catalog refreshed successfully',
+            'count': len(catalog_data)
+        })
+    except Exception as e:
+        print(f"Error refreshing catalog: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# ============================================================================
+# REACT SPA SERVING
+# ============================================================================
+
+@app.route('/app')
+@app.route('/app/')
+@app.route('/app/<path:path>')
+def react_app(path=''):
+    """Serve the React SPA"""
+    try:
+        # Check if built files exist
+        bundle_js = os.path.join('static', 'dist', 'bundle.js')
+        bundle_css = os.path.join('static', 'dist', 'bundle.css')
+        
+        if not os.path.exists(bundle_js):
+            return render_template_string("""
+                <h1>React App Not Built</h1>
+                <p>The React application has not been built yet.</p>
+                <p>To build the React app, run:</p>
+                <pre>npm install && npm run build</pre>
+                <p><a href="/">← Back to Flask App</a></p>
+            """), 404
+        
+        # Serve the built index.html file
+        index_file = os.path.join('static', 'dist', 'index.html')
+        if os.path.exists(index_file):
+            with open(index_file, 'r') as f:
+                return f.read()
+        else:
+            # Fallback template with module script
+            return render_template_string("""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Album Catalog</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/static/dist/bundle.css">
+</head>
+<body>
+    <div id="root"></div>
+    <script type="module" src="/static/dist/bundle.js"></script>
+</body>
+</html>
+            """)
+    except Exception as e:
+        print(f"Error serving React app: {e}")
+        return f"Error loading React app: {e}", 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

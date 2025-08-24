@@ -1,0 +1,492 @@
+/* Album Detail Component Styles - New Design */
+
+/* Page Layout */
+.album-page {
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: #f5f5f5;
+  min-height: 100vh;
+}
+
+/* Page Header - Dark bar with title */
+.album-page-header {
+  background-color: #4a5568;
+  color: white;
+  padding: 1rem 2rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.album-page-title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 500;
+  text-align: left;
+}
+
+/* Main Content Layout */
+.album-main-content {
+  display: flex;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+  gap: 3rem;
+  align-items: flex-start;
+}
+
+/* Left Side - Album Cover */
+.album-cover-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+.album-cover-container {
+  position: relative;
+  width: 400px;
+  height: 400px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  background-color: white;
+}
+
+.album-cover-container img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.album-cover-placeholder {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #f0f0f0;
+  border: 2px dashed #ccc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  font-size: 1rem;
+}
+
+/* Album Star Overlay */
+.album-star-overlay {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: rgba(0,0,0,0.7);
+  border: none;
+  border-radius: 50%;
+  padding: 12px;
+  cursor: pointer;
+  color: white;
+  font-size: 1.4rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  transition: all 0.2s;
+  min-width: 48px;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.album-star-overlay:hover {
+  background: rgba(0,0,0,0.9);
+  transform: scale(1.1);
+}
+
+.album-star-overlay.starred {
+  color: #ffc107 !important;
+}
+
+.album-star-overlay .fas {
+  color: #ffc107 !important;
+}
+
+.album-star-overlay .far {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Album Metadata Section */
+.album-metadata-section {
+  width: 100%;
+  max-width: 400px;
+  background-color: white;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.metadata-toggle {
+  width: 100%;
+  background-color: #f8f9fa;
+  border: none;
+  padding: 1rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #495057;
+  transition: background-color 0.2s;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.metadata-toggle:hover {
+  background-color: #e9ecef;
+}
+
+.metadata-toggle i {
+  color: #6c757d;
+}
+
+.metadata-content {
+  padding: 1.25rem;
+}
+
+.metadata-grid {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 0.75rem;
+  align-items: start;
+}
+
+.metadata-grid strong {
+  color: #495057;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.metadata-grid span,
+.metadata-grid a {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.metadata-grid a {
+  color: #007bff;
+  text-decoration: none;
+}
+
+.metadata-grid a:hover {
+  color: #0056b3;
+  text-decoration: underline;
+}
+
+.metadata-grid .monospace {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.8rem;
+  background-color: #f8f9fa;
+  padding: 0.25rem 0.5rem;
+  border-radius: 3px;
+}
+
+/* Right Side - Track Listing */
+.track-listing-section {
+  flex: 1;
+  min-width: 0;
+}
+
+.track-list {
+  background-color: white;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.track-item {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #f1f5f9;
+  transition: background-color 0.2s;
+  gap: 1rem;
+}
+
+.track-item:last-child {
+  border-bottom: none;
+}
+
+.track-item:hover {
+  background-color: #f8f9fa;
+}
+
+.track-item.starred {
+  background-color: #fff3cd;
+}
+
+.track-item.starred:hover {
+  background-color: #ffeaa7;
+}
+
+.track-star-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem;
+  color: #cbd5e0;
+  font-size: 1.1rem;
+  transition: all 0.2s;
+  border-radius: 3px;
+  min-width: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.track-star-button:hover {
+  color: #ffc107;
+  background-color: #f8f9fa;
+  transform: scale(1.1);
+}
+
+.track-star-button.starred {
+  color: #ffc107;
+}
+
+.track-number {
+  min-width: 3rem;
+  font-weight: 500;
+  color: #6c757d;
+  font-size: 0.9rem;
+  text-align: left;
+}
+
+.track-name {
+  flex: 1;
+  color: #2d3748;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+/* No Tracks State */
+.no-tracks-state {
+  background-color: white;
+  padding: 3rem 2rem;
+  border-radius: 8px;
+  text-align: center;
+  color: #666;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.no-tracks-state i {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  display: block;
+  color: #cbd5e0;
+}
+
+.no-tracks-state h3 {
+  margin-bottom: 1rem;
+  color: #495057;
+  font-size: 1.2rem;
+}
+
+.no-tracks-state p {
+  margin: 0;
+  color: #6c757d;
+  font-size: 0.9rem;
+}
+
+/* Loading and Error States */
+.loading, .error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  text-align: center;
+  margin: 2rem;
+}
+
+.loading i.fa-spinner {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+  color: #007bff;
+}
+
+.error h3 {
+  color: #dc3545;
+  margin-bottom: 1rem;
+}
+
+.error p {
+  color: #6c757d;
+  margin-bottom: 1.5rem;
+}
+
+.error a {
+  color: #007bff;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.error a:hover {
+  color: #0056b3;
+  text-decoration: underline;
+}
+
+/* Alert Styles */
+.alert {
+  padding: 1rem;
+  border-radius: 8px;
+  margin: 2rem;
+  text-align: center;
+}
+
+.alert-warning {
+  background-color: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeaa7;
+}
+
+.alert h2 {
+  margin-bottom: 0.5rem;
+  color: #856404;
+}
+
+.alert p {
+  margin-bottom: 1rem;
+  color: #856404;
+}
+
+.alert a {
+  color: #007bff;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.alert a:hover {
+  color: #0056b3;
+  text-decoration: underline;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .album-main-content {
+    flex-direction: column;
+    align-items: center;
+    gap: 2rem;
+    padding: 1.5rem;
+  }
+  
+  .album-cover-container {
+    width: 350px;
+    height: 350px;
+  }
+  
+  .album-metadata-section {
+    width: 350px;
+  }
+  
+  .track-listing-section {
+    width: 100%;
+    max-width: 600px;
+  }
+}
+
+@media (max-width: 768px) {
+  .album-page-header {
+    padding: 1rem;
+  }
+  
+  .album-page-title {
+    font-size: 1.2rem;
+    line-height: 1.3;
+  }
+  
+  .album-main-content {
+    padding: 1rem;
+    gap: 1.5rem;
+  }
+  
+  .album-cover-container {
+    width: 280px;
+    height: 280px;
+  }
+  
+  .album-metadata-section {
+    width: 280px;
+  }
+  
+  .metadata-grid {
+    grid-template-columns: 100px 1fr;
+    gap: 0.5rem;
+  }
+  
+  .track-item {
+    padding: 0.75rem;
+    gap: 0.75rem;
+  }
+  
+  .track-number {
+    min-width: 2.5rem;
+  }
+  
+  .track-name {
+    font-size: 0.95rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .album-page-header {
+    padding: 0.75rem;
+  }
+  
+  .album-page-title {
+    font-size: 1rem;
+  }
+  
+  .album-main-content {
+    padding: 0.75rem;
+  }
+  
+  .album-cover-container {
+    width: 240px;
+    height: 240px;
+  }
+  
+  .album-metadata-section {
+    width: 240px;
+  }
+  
+  .album-star-overlay {
+    top: 8px;
+    right: 8px;
+    padding: 8px;
+    font-size: 1.2rem;
+    min-width: 36px;
+    min-height: 36px;
+  }
+  
+  .metadata-toggle {
+    padding: 0.75rem;
+    font-size: 0.9rem;
+  }
+  
+  .metadata-content {
+    padding: 1rem;
+  }
+  
+  .track-item {
+    padding: 0.5rem 0.75rem;
+  }
+  
+  .track-name {
+    font-size: 0.9rem;
+  }
+}

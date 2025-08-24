@@ -16,6 +16,14 @@ barcode_queue.db
 starred.csv
 starred_albums.csv
 
+# User data backups
+starred_backups/
+
+# React build files
+node_modules/
+static/dist/
+package-lock.json
+
 # Shared data directory with runtime files
 shared_data/
 
