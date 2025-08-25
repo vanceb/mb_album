@@ -1,21 +1,55 @@
-import React from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import React, { useState, useEffect } from 'react'
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { AppProvider } from '../hooks/useAppContext'
 import Navbar from './Navbar'
 import CatalogControls from './CatalogControls'
 import CatalogView from './CatalogView'
 import AlbumDetail from './AlbumDetail'
 import StarredTracks from './StarredTracks'
+import api from '../services/api'
 
 function DynamicHeader() {
   const location = useLocation()
   const navigate = useNavigate()
+  const [albumTitle, setAlbumTitle] = useState(null)
+  
+  // Extract barcode from album path
+  const getBarcode = () => {
+    const match = location.pathname.match(/^\/album\/(.+)/)
+    return match ? match[1] : null
+  }
+  
+  // Load album data for title when on album page
+  useEffect(() => {
+    const loadAlbumTitle = async () => {
+      const barcode = getBarcode()
+      if (barcode) {
+        try {
+          const albumResponse = await api.getAlbum(barcode)
+          if (albumResponse && albumResponse.album) {
+            const albumData = albumResponse.album
+            // Format: Artist - Album (Year)
+            const year = albumData['First Release'] ? albumData['First Release'].substring(0, 4) : ''
+            const title = `${albumData.Artist} - ${albumData['Album/Release']}${year ? ` (${year})` : ''}`
+            setAlbumTitle(title)
+          }
+        } catch (error) {
+          console.error('Error loading album title:', error)
+          setAlbumTitle('Album Details')
+        }
+      } else {
+        setAlbumTitle(null)
+      }
+    }
+    
+    loadAlbumTitle()
+  }, [location.pathname])
   
   const getPageTitle = () => {
     if (location.pathname === '/') {
-      return 'Catalog View'
+      return 'Albums'
     } else if (location.pathname.startsWith('/album/')) {
-      return 'Album Details'
+      return albumTitle || 'Loading...'
     } else if (location.pathname === '/starred-tracks') {
       return 'Starred Tracks'
     }

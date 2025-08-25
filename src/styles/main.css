@@ -479,6 +479,46 @@ body {
     background-color: #545b62;
 }
 
+/* Refresh button specific styling */
+.btn-primary[disabled] {
+    background-color: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.65;
+}
+
+/* Enhanced styling for sync refresh buttons - with higher specificity */
+.modal-body .btn-primary,
+.btn.btn-primary {
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%) !important;
+    box-shadow: 0 2px 4px rgba(0, 123, 255, 0.3) !important;
+    border: none !important;
+    font-weight: 500 !important;
+    color: white !important;
+    opacity: 1 !important;
+}
+
+.modal-body .btn-primary:not([disabled]):hover,
+.btn.btn-primary:not([disabled]):hover {
+    background: linear-gradient(135deg, #0056b3 0%, #004085 100%) !important;
+    box-shadow: 0 4px 8px rgba(0, 123, 255, 0.4) !important;
+    transform: translateY(-1px) !important;
+}
+
+.modal-body .btn-primary:not([disabled]):active,
+.btn.btn-primary:not([disabled]):active {
+    transform: translateY(0) !important;
+    box-shadow: 0 2px 4px rgba(0, 123, 255, 0.3) !important;
+}
+
+/* Override disabled styling for modal buttons */
+.modal-body .btn-primary[disabled] {
+    background: linear-gradient(135deg, #6c757d 0%, #545b62 100%) !important;
+    box-shadow: none !important;
+    opacity: 0.65 !important;
+    cursor: not-allowed !important;
+}
+
+
 /* Star icon styles */
 .star-icon {
     cursor: pointer;

@@ -4,8 +4,8 @@ import storageService from '../services/storage'
 import apiService from '../services/api'
 
 function TransferModal({ isOpen, onClose }) {
-  const { currentUser, userData, importUserData, exportUserData } = useAppContext()
-  const [activeTab, setActiveTab] = useState('export')
+  const { currentUser, userData, importUserData, exportUserData, refreshUserData } = useAppContext()
+  const [activeTab, setActiveTab] = useState('sync')
   const [syncId, setSyncId] = useState('')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
@@ -13,6 +13,7 @@ function TransferModal({ isOpen, onClose }) {
 
   if (!isOpen || !currentUser) return null
 
+  // Get current user data (will update when userData context changes)
   const currentUserData = userData[currentUser]
   
   // Check if user is linked to a sync ID
@@ -90,10 +91,13 @@ function TransferModal({ isOpen, onClose }) {
         // Use storage service to update current user
         storageService.updateUserData(currentUser, updatedData)
         
+        // Refresh the context to reflect localStorage changes immediately
+        refreshUserData()
+        
         const newAlbumsCount = mergedAlbums.length - currentAlbums.length
         showMessage(`Import successful! Added ${newAlbumsCount} new starred albums to your collection.`)
         
-        // Close modal to refresh the UI
+        // Close modal after showing success message
         setTimeout(() => {
           onClose()
         }, 1500)
@@ -116,9 +120,13 @@ function TransferModal({ isOpen, onClose }) {
       }
       
       storageService.updateUserData(currentUser, updatedData)
+      
+      // Refresh the context to reflect localStorage changes immediately
+      refreshUserData()
+      
       showMessage('Successfully unlinked from sync ID.')
       
-      // Close modal to refresh the UI  
+      // Close modal after showing success message
       setTimeout(() => {
         onClose()
       }, 1500)
@@ -186,6 +194,9 @@ function TransferModal({ isOpen, onClose }) {
         // Use storage service to update current user
         storageService.updateUserData(currentUser, updatedData)
         
+        // Refresh the context to reflect localStorage changes immediately
+        refreshUserData()
+        
         if (overrideSyncId) {
           // For refresh - show server state vs local state comparison
           const currentAlbums = currentUserData?.starredAlbums || []
@@ -198,9 +209,9 @@ function TransferModal({ isOpen, onClose }) {
           setSyncId('') // Only clear input if not a refresh
         }
         
-        // Force a full page reload to properly refresh all components and state
+        // Close modal after showing success message - no page reload needed
         setTimeout(() => {
-          window.location.reload()
+          onClose()
         }, 1500)
       } else {
         showMessage('No data found for this sync ID', 'error')
@@ -233,6 +244,12 @@ function TransferModal({ isOpen, onClose }) {
 
         <div className="modal-tabs">
           <button 
+            className={`tab ${activeTab === 'sync' ? 'active' : ''}`}
+            onClick={() => setActiveTab('sync')}
+          >
+            Sync Code
+          </button>
+          <button 
             className={`tab ${activeTab === 'export' ? 'active' : ''}`}
             onClick={() => setActiveTab('export')}
           >
@@ -243,12 +260,6 @@ function TransferModal({ isOpen, onClose }) {
             onClick={() => setActiveTab('import')}
           >
             Import
-          </button>
-          <button 
-            className={`tab ${activeTab === 'sync' ? 'active' : ''}`}
-            onClick={() => setActiveTab('sync')}
-          >
-            Sync Code
           </button>
         </div>
 
@@ -347,7 +358,7 @@ function TransferModal({ isOpen, onClose }) {
                     />
                     <button 
                       className="btn btn-primary"
-                      onClick={handleSyncIdImport}
+                      onClick={() => handleSyncIdImport()}
                       disabled={loading || !syncId.trim()}
                     >
                       {loading ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-link"></i>}

@@ -71,24 +71,33 @@
 }
 
 .refresh-btn {
-  background: none;
-  border: 1px solid #ccc;
+  background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+  border: none;
   border-radius: 4px;
   padding: 0.5rem;
   cursor: pointer;
-  color: #666;
+  color: white;
   font-size: 1rem;
   transition: all 0.2s;
   min-width: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 123, 255, 0.3);
 }
 
 .refresh-btn:hover {
-  background-color: #f8f9fa;
-  border-color: #007bff;
-  color: #007bff;
+  background: linear-gradient(135deg, #0056b3 0%, #004085 100%);
+  box-shadow: 0 4px 8px rgba(0, 123, 255, 0.4);
+  transform: translateY(-1px);
+}
+
+.refresh-btn:disabled {
+  background: linear-gradient(135deg, #6c757d 0%, #545b62 100%);
+  color: white;
+  opacity: 0.65;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 
 /* Buttons */

@@ -117,12 +117,6 @@ function AlbumDetail() {
 
   return (
     <div className="album-page">
-      {/* Page Header - Title in dark bar */}
-      <div className="album-page-header">
-        <h1 className="album-page-title">
-          {albumData.Artist} - {albumData['Album/Release']} ({getAlbumYear()})
-        </h1>
-      </div>
 
       {/* Main Content Area */}
       <div className="album-main-content">
