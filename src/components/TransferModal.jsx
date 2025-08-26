@@ -1,7 +1,8 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useAppContext } from '../hooks/useAppContext'
 import storageService from '../services/storage'
 import apiService from '../services/api'
+import { getSpotifyAuthUrl, hasValidSpotifyAuth, hasSpotifyConnected } from '../utils/spotify'
 
 function TransferModal({ isOpen, onClose }) {
   const { currentUser, userData, importUserData, exportUserData, refreshUserData } = useAppContext()
@@ -10,6 +11,48 @@ function TransferModal({ isOpen, onClose }) {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [messageType, setMessageType] = useState('') // 'success' or 'error'
+
+  // Handle Spotify authentication on mount
+  useEffect(() => {
+    // Check for Spotify auth data in URL
+    const urlParams = new URLSearchParams(window.location.search)
+    const spotifyAuthData = urlParams.get('spotify_auth')
+    
+    if (spotifyAuthData && currentUser) {
+      try {
+        const authData = JSON.parse(spotifyAuthData)
+        
+        // Update current user with Spotify auth data
+        const updatedData = {
+          ...currentUserData,
+          spotifyAuth: authData
+        }
+        
+        storageService.updateUserData(currentUser, updatedData)
+        refreshUserData()
+        
+        // Clean up URL
+        window.history.replaceState({}, document.title, window.location.pathname)
+        
+        // Force a small delay to ensure userData context has updated before showing success
+        setTimeout(() => {
+          showMessage('Spotify account connected successfully!')
+          setActiveTab('spotify')
+        }, 100)
+        
+      } catch (error) {
+        console.error('Error processing Spotify auth:', error)
+        showMessage('Error connecting Spotify account', 'error')
+      }
+    }
+    
+    // Check for Spotify error
+    const spotifyError = urlParams.get('spotify_error')
+    if (spotifyError) {
+      showMessage(`Spotify connection failed: ${spotifyError}`, 'error')
+      window.history.replaceState({}, document.title, window.location.pathname)
+    }
+  }, [currentUser, isOpen])
 
   if (!isOpen || !currentUser) return null
 
@@ -261,6 +304,12 @@ function TransferModal({ isOpen, onClose }) {
           >
             Import
           </button>
+          <button 
+            className={`tab ${activeTab === 'spotify' ? 'active' : ''}`}
+            onClick={() => setActiveTab('spotify')}
+          >
+            Spotify
+          </button>
         </div>
 
         <div className="modal-body">
@@ -396,6 +445,88 @@ function TransferModal({ isOpen, onClose }) {
                   
                   <div className="sync-note">
                     <strong>Note:</strong> Your starred changes are automatically synced to the server. Use refresh to pull the latest changes from other browsers.
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'spotify' && (
+            <div className="tab-content">
+              <h4>Spotify Integration</h4>
+              
+              {!hasSpotifyConnected(currentUserData) ? (
+                <div>
+                  <p>Connect your Spotify account to enable album playback and linking features.</p>
+                  <div className="sync-note">
+                    <strong>Requirements:</strong> You need Spotify Premium for playback control.
+                  </div>
+                  <button 
+                    className="btn btn-primary"
+                    onClick={() => window.location.href = getSpotifyAuthUrl()}
+                  >
+                    <i className="fas fa-spotify"></i> Connect Spotify Account
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <div className={hasValidSpotifyAuth(currentUserData) ? "alert-success" : "alert alert-warning"}>
+                    <strong>✓ Spotify Connected</strong><br />
+                    Account: {currentUserData.spotifyAuth?.display_name || currentUserData.spotifyAuth?.user_id || 'Unknown'}
+                    {!hasValidSpotifyAuth(currentUserData) && (
+                      <><br /><small>⚠️ Token expired - will refresh automatically when needed</small></>
+                    )}
+                  </div>
+                  
+                  {!hasValidSpotifyAuth(currentUserData) && (
+                    <div className="sync-note" style={{marginBottom: '1rem'}}>
+                      <strong>Note:</strong> To use the new Web Playback features, you'll need to reconnect your Spotify account to get updated permissions.
+                    </div>
+                  )}
+                  
+                  <p>Your Spotify account is connected. You can now:</p>
+                  <ul style={{margin: '1rem 0', paddingLeft: '1.5rem'}}>
+                    <li>Link catalog albums to Spotify albums</li>
+                    <li>Play albums and tracks on your devices</li>
+                    <li>Control playback from the album views</li>
+                    {hasValidSpotifyAuth(currentUserData) && <li>Use real-time Web Playback controls</li>}
+                  </ul>
+                  
+                  <div style={{display: 'flex', gap: '0.5rem', marginTop: '1rem'}}>
+                    {!hasValidSpotifyAuth(currentUserData) && (
+                      <button 
+                        className="btn btn-primary"
+                        onClick={() => window.location.href = getSpotifyAuthUrl()}
+                      >
+                        <i className="fas fa-sync-alt"></i> Reconnect for New Features
+                      </button>
+                    )}
+                    <button 
+                      className="btn btn-secondary"
+                      onClick={() => {
+                        if (confirm('Are you sure you want to disconnect your Spotify account? This will also unlink all Spotify albums.')) {
+                          // Disconnect Spotify
+                          const updatedData = {
+                            ...currentUserData,
+                            spotifyAuth: null,
+                            linkedAlbums: {}
+                          }
+                          storageService.updateUserData(currentUser, updatedData)
+                          refreshUserData()
+                          
+                          // Add delay to ensure UI updates
+                          setTimeout(() => {
+                            showMessage('Spotify account disconnected successfully')
+                          }, 100)
+                        }
+                      }}
+                    >
+                      <i className="fas fa-unlink"></i> Disconnect
+                    </button>
+                  </div>
+                  
+                  <div className="sync-note" style={{marginTop: '1rem'}}>
+                    <strong>Linked Albums:</strong> {Object.keys(currentUserData.linkedAlbums || {}).length}
                   </div>
                 </div>
               )}

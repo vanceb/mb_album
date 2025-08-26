@@ -383,7 +383,7 @@
     <div class="header">
         <h1>{% block header %}Album Catalog{% endblock %}</h1>
         <nav class="navbar">
-            <a href="/app"><i class="fas fa-compact-disc"></i> Albums</a>
+            <a href="/"><i class="fas fa-compact-disc"></i> Albums</a>
             <a href="{{ url_for('starred_tracks') }}"><i class="fas fa-star"></i> Starred Tracks</a>
             <div class="dropdown" id="user-dropdown">
                 <div class="dropdown-toggle" onclick="toggleUserDropdown()">
@@ -405,7 +405,7 @@
                     <i class="fas fa-chevron-down"></i>
                 </div>
                 <div class="dropdown-menu">
-                    <a href="{{ url_for('index') }}"><i class="fas fa-qrcode"></i> Scan Barcodes</a>
+                    <a href="{{ url_for('admin_index') }}"><i class="fas fa-qrcode"></i> Scan Barcodes</a>
                     <a href="{{ url_for('queue_status') }}"><i class="fas fa-cogs"></i> Queue Status</a>
                     <a href="{{ url_for('missing_coverart') }}"><i class="fas fa-image"></i> Missing Cover Art</a>
                 </div>

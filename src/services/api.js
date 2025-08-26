@@ -25,7 +25,11 @@ class ApiService {
   }
 
   async getCatalog() {
+    console.log('API: Requesting catalog from', API_ENDPOINTS.catalog)
     const data = await this.request(API_ENDPOINTS.catalog)
+    console.log('API: Catalog response structure:', Object.keys(data))
+    console.log('API: Catalog count:', data.count, 'items')
+    console.log('API: Catalog data length:', data.catalog ? data.catalog.length : 'null')
     return data.catalog
   }
 

@@ -98,7 +98,11 @@ def get_spotify_token(client_id, client_secret, redirect_uri):
                 'user-library-modify '
                 'playlist-modify-public '
                 'user-read-private '
-                'user-read-email'
+                'user-read-email '
+                'user-read-playback-state '
+                'user-modify-playback-state '
+                'user-read-currently-playing '
+                'streaming'
             )
         )
         

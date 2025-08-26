@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { AppProvider } from '../hooks/useAppContext'
+import { AppProvider, useAppContext } from '../hooks/useAppContext'
 import Navbar from './Navbar'
 import CatalogControls from './CatalogControls'
 import CatalogView from './CatalogView'
 import AlbumDetail from './AlbumDetail'
 import StarredTracks from './StarredTracks'
+import AlbumLinkingModal from './AlbumLinkingModal'
+import SpotifyPlayerBar from './SpotifyPlayerBar'
 import api from '../services/api'
 
 function DynamicHeader() {
@@ -85,7 +87,7 @@ function DynamicHeader() {
 function App() {
   return (
     <AppProvider>
-      <Router basename="/app">
+      <Router>
         <DynamicHeader />
         
         <div className="container">
@@ -96,8 +98,26 @@ function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>
+        
+        <AppModals />
+        <SpotifyPlayerBar />
       </Router>
     </AppProvider>
+  )
+}
+
+function AppModals() {
+  const { albumLinkingModal, closeAlbumLinkingModal } = useAppContext()
+  
+  return (
+    <>
+      <AlbumLinkingModal
+        isOpen={albumLinkingModal.isOpen}
+        onClose={closeAlbumLinkingModal}
+        albumData={albumLinkingModal.albumData}
+        catalogBarcode={albumLinkingModal.catalogBarcode}
+      />
+    </>
   )
 }
 

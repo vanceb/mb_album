@@ -3,8 +3,14 @@ import csv
 import os
 import json
 import atexit
+import requests
+from datetime import datetime, timedelta
+from dotenv import load_dotenv
 from shared_data import shared_data
 from background_worker import get_worker, start_worker, stop_worker
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = Flask(__name__)
 
@@ -278,12 +284,12 @@ def get_enriched_starred_tracks():
     enriched_tracks.sort(key=lambda x: (x['artist'], x['album'], int(x['track_number'])))
     return enriched_tracks
 
-@app.route('/')
-def index():
-    """Main barcode scanning page"""
+@app.route('/admin')
+def admin_index():
+    """Admin barcode scanning page"""
     return render_template('index.html')
 
-@app.route('/scan', methods=['POST'])
+@app.route('/admin/scan', methods=['POST'])
 def scan_barcode():
     """Handle barcode scanning - add to shared pending queue"""
     data = request.get_json()
@@ -324,6 +330,8 @@ def scan_barcode():
     # Add to pending barcodes for worker to pick up
     success = shared_data.add_pending_barcode(barcode)
     if success:
+        # Record scan activity for catalog rebuild tracking
+        shared_data.record_scan_activity()
         response = {
             'success': True,
             'status': 'queued',
@@ -335,7 +343,7 @@ def scan_barcode():
     else:
         return jsonify({'error': 'Failed to queue barcode'}), 500
 
-@app.route('/status/<barcode>')
+@app.route('/admin/status/<barcode>')
 def barcode_status(barcode):
     """Get current status of a barcode"""
     # Check if in catalog first (using shared data)
@@ -383,20 +391,20 @@ def barcode_status(barcode):
     
     return jsonify({'error': 'Barcode not found'}), 404
 
-@app.route('/queue')
+@app.route('/admin/queue')
 def queue_status():
     """Queue management page"""
     stats = shared_data.get_worker_stats()
     worker_status = stats  # Worker stats includes queue stats
     return render_template('queue.html', stats=stats, worker_status=worker_status)
 
-@app.route('/queue/stats')
+@app.route('/admin/queue/stats')
 def queue_stats_api():
     """API endpoint for queue statistics"""
     stats = shared_data.get_worker_stats()
     return jsonify(stats)
 
-@app.route('/queue/failed')
+@app.route('/admin/queue/failed')
 def failed_barcodes():
     """Get failed barcodes for retry"""
     # Get all queue items and filter for failed ones
@@ -404,22 +412,24 @@ def failed_barcodes():
     failed = [item for item in all_queue.values() if item.get('status') == 'failed'] if all_queue else []
     return jsonify(failed)
 
-@app.route('/queue/retry/<barcode>', methods=['POST'])
+@app.route('/admin/queue/retry/<barcode>', methods=['POST'])
 def retry_barcode(barcode):
     """Retry a failed barcode - add back to pending queue"""
     success = shared_data.add_pending_barcode(barcode)
     if success:
+        # Record scan activity for catalog rebuild tracking
+        shared_data.record_scan_activity()
         return jsonify({'success': True, 'message': f'Barcode {barcode} queued for retry'})
     else:
         return jsonify({'success': False, 'error': 'Failed to queue barcode for retry'}), 500
 
-@app.route('/queue/no-coverart')
+@app.route('/admin/queue/no-coverart')
 def no_coverart_list():
     """Get list of albums without cover art"""
     albums = shared_data.get_no_coverart_cache()
     return jsonify(albums)
 
-@app.route('/queue/retry-coverart/<barcode>', methods=['POST'])
+@app.route('/admin/queue/retry-coverart/<barcode>', methods=['POST'])
 def retry_coverart(barcode):
     """Retry cover art download for a specific barcode"""
     try:
@@ -465,14 +475,14 @@ def retry_coverart(barcode):
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/catalog')
+@app.route('/admin/catalog')
 def catalog():
     """Catalog review page"""
     catalog_data = shared_data.get_catalog_cache()
     starred_albums = load_starred_albums()
     return render_template('catalog.html', catalog=catalog_data, starred_albums=starred_albums)
 
-@app.route('/missing-coverart')
+@app.route('/admin/missing-coverart')
 def missing_coverart():
     """Missing cover art management page"""
     albums = shared_data.get_no_coverart_cache()
@@ -487,7 +497,7 @@ def missing_coverart():
     
     return render_template('missing_coverart.html', albums=enriched_albums)
 
-@app.route('/starred-tracks')
+@app.route('/admin/starred-tracks')
 def starred_tracks():
     """Starred tracks page"""
     starred_tracks = get_enriched_starred_tracks()
@@ -513,7 +523,7 @@ def unstar_track_endpoint(barcode, track_number):
         print(f"Error unstarring track #{track_number} for {barcode}: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/album/<barcode>')
+@app.route('/admin/album/<barcode>')
 def album_detail(barcode):
     """Full album details view"""
     # Find the album in catalog (using shared data)
@@ -713,18 +723,39 @@ def api_get_starred_tracks_backup(sync_id):
 
 @app.route('/api/catalog/refresh', methods=['POST'])
 def api_refresh_catalog():
-    """API endpoint to force catalog refresh (Admin only - no auth for now)"""
+    """API endpoint to refresh catalog only if needed based on scan activity"""
     try:
-        # Force refresh of catalog cache
-        shared_data.force_refresh_catalog()
+        print("API: Checking if catalog refresh is needed...")
         
-        # Get updated catalog
+        # Check if catalog actually needs rebuilding
+        if shared_data.should_rebuild_catalog():
+            print("API: Catalog rebuild needed - forcing refresh...")
+            # Force refresh of catalog cache
+            shared_data.force_refresh_catalog()
+            
+            # Mark as rebuilt
+            shared_data.mark_catalog_rebuilt()
+            
+            message = 'Catalog refreshed due to recent scan activity'
+        else:
+            print("API: Catalog is up to date - no rebuild needed")
+            message = 'Catalog is already up to date'
+        
+        # Get current catalog
         catalog_data = shared_data.get_catalog_cache()
+        
+        # Get scan metadata for response
+        scan_metadata = shared_data.get_scan_metadata()
         
         return jsonify({
             'success': True,
-            'message': 'Catalog refreshed successfully',
-            'count': len(catalog_data)
+            'message': message,
+            'count': len(catalog_data),
+            'scan_info': {
+                'last_scan_time': scan_metadata.get('last_scan_time'),
+                'last_catalog_rebuild': scan_metadata.get('last_catalog_rebuild'),
+                'pending_rebuild': scan_metadata.get('pending_catalog_rebuild', False)
+            }
         })
     except Exception as e:
         print(f"Error refreshing catalog: {e}")
@@ -734,11 +765,10 @@ def api_refresh_catalog():
 # REACT SPA SERVING
 # ============================================================================
 
-@app.route('/app')
-@app.route('/app/')
-@app.route('/app/<path:path>')
+@app.route('/')
+@app.route('/<path:path>')
 def react_app(path=''):
-    """Serve the React SPA"""
+    """Serve the React SPA at root"""
     try:
         # Check if built files exist
         bundle_js = os.path.join('static', 'dist', 'bundle.js')
@@ -750,7 +780,7 @@ def react_app(path=''):
                 <p>The React application has not been built yet.</p>
                 <p>To build the React app, run:</p>
                 <pre>npm install && npm run build</pre>
-                <p><a href="/">← Back to Flask App</a></p>
+                <p><a href="/admin">← Admin Tools</a></p>
             """), 404
         
         # Serve the built index.html file
@@ -779,6 +809,115 @@ def react_app(path=''):
     except Exception as e:
         print(f"Error serving React app: {e}")
         return f"Error loading React app: {e}", 500
+
+# Spotify Integration
+SPOTIFY_CLIENT_ID = 'bf2410b819cb452eb0ff08b17005e414'
+SPOTIFY_CLIENT_SECRET = os.getenv('SPOTIFY_CLIENT_SECRET')
+
+if not SPOTIFY_CLIENT_SECRET:
+    print("WARNING: SPOTIFY_CLIENT_SECRET environment variable not set!")
+    print("Please add your Spotify Client Secret to the .env file")
+
+@app.route('/spotify/callback')
+def spotify_callback():
+    """Handle Spotify OAuth callback"""
+    try:
+        code = request.args.get('code')
+        error = request.args.get('error')
+        
+        if error:
+            return redirect(f'/?spotify_error={error}')
+            
+        if not code:
+            return redirect('/?spotify_error=no_code')
+        
+        # Exchange authorization code for tokens
+        token_data = {
+            'grant_type': 'authorization_code',
+            'code': code,
+            'redirect_uri': 'http://127.0.0.1:5000/spotify/callback',
+            'client_id': SPOTIFY_CLIENT_ID,
+            'client_secret': SPOTIFY_CLIENT_SECRET
+        }
+        
+        response = requests.post('https://accounts.spotify.com/api/token', data=token_data)
+        
+        if not response.ok:
+            return redirect(f'/?spotify_error=token_exchange_failed')
+            
+        token_info = response.json()
+        
+        # Calculate expiration time
+        expires_in = token_info.get('expires_in', 3600)
+        expires_at = (datetime.now() + timedelta(seconds=expires_in)).isoformat()
+        
+        # Get user profile
+        profile_response = requests.get('https://api.spotify.com/v1/me', 
+                                      headers={'Authorization': f"Bearer {token_info['access_token']}"})
+        
+        if profile_response.ok:
+            profile = profile_response.json()
+            spotify_user_id = profile.get('id', 'unknown')
+            spotify_display_name = profile.get('display_name') or profile.get('id', 'Unknown User')
+        else:
+            spotify_user_id = 'unknown'
+            spotify_display_name = 'Unknown User'
+        
+        # Build auth data to pass to frontend
+        auth_data = {
+            'access_token': token_info['access_token'],
+            'refresh_token': token_info.get('refresh_token'),
+            'expires_at': expires_at,
+            'user_id': spotify_user_id,
+            'display_name': spotify_display_name
+        }
+        
+        # Redirect back to React app with auth data in URL fragment
+        import urllib.parse
+        auth_params = urllib.parse.urlencode({'spotify_auth': json.dumps(auth_data)})
+        return redirect(f'/?{auth_params}')
+        
+    except Exception as e:
+        print(f"Spotify callback error: {e}")
+        return redirect(f'/?spotify_error=callback_failed')
+
+@app.route('/spotify/refresh', methods=['POST'])
+def spotify_refresh_token():
+    """Refresh Spotify access token"""
+    try:
+        data = request.get_json()
+        refresh_token = data.get('refresh_token')
+        
+        if not refresh_token:
+            return jsonify({'error': 'No refresh token provided'}), 400
+            
+        token_data = {
+            'grant_type': 'refresh_token',
+            'refresh_token': refresh_token,
+            'client_id': SPOTIFY_CLIENT_ID,
+            'client_secret': SPOTIFY_CLIENT_SECRET
+        }
+        
+        response = requests.post('https://accounts.spotify.com/api/token', data=token_data)
+        
+        if not response.ok:
+            return jsonify({'error': 'Token refresh failed'}), 400
+            
+        token_info = response.json()
+        
+        # Calculate new expiration time
+        expires_in = token_info.get('expires_in', 3600)
+        expires_at = (datetime.now() + timedelta(seconds=expires_in)).isoformat()
+        
+        return jsonify({
+            'access_token': token_info['access_token'],
+            'expires_at': expires_at,
+            'refresh_token': token_info.get('refresh_token', refresh_token)  # Use new or keep existing
+        })
+        
+    except Exception as e:
+        print(f"Spotify refresh error: {e}")
+        return jsonify({'error': 'Token refresh failed'}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

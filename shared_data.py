@@ -25,6 +25,10 @@ class SharedDataManager:
         self.queue_status_file = os.path.join(data_dir, 'queue_status.json')
         self.worker_stats_file = os.path.join(data_dir, 'worker_stats.json')
         self.no_coverart_cache_file = os.path.join(data_dir, 'no_coverart_cache.json')
+        self.scan_metadata_file = os.path.join(data_dir, 'scan_metadata.json')
+        
+        # Grace period for catalog rebuilds (seconds)
+        self.catalog_rebuild_grace_period = 30
     
     def add_pending_barcode(self, barcode: str) -> bool:
         """Add a barcode to the pending queue (Flask -> Worker communication)"""
@@ -217,6 +221,67 @@ class SharedDataManager:
     def get_current_timestamp(self) -> str:
         """Get current timestamp in ISO format"""
         return datetime.now().isoformat()
+    
+    def record_scan_activity(self):
+        """Record when a new barcode is scanned"""
+        try:
+            scan_data = {
+                'last_scan_time': datetime.now().isoformat(),
+                'pending_catalog_rebuild': True
+            }
+            self._write_json_file(self.scan_metadata_file, scan_data)
+            print(f"Scan activity recorded: {scan_data['last_scan_time']}")
+        except Exception as e:
+            print(f"Error recording scan activity: {e}")
+    
+    def get_scan_metadata(self):
+        """Get scan timing metadata"""
+        try:
+            return self._read_json_file(self.scan_metadata_file) or {}
+        except Exception as e:
+            print(f"Error reading scan metadata: {e}")
+            return {}
+    
+    def should_rebuild_catalog(self):
+        """Check if catalog needs rebuilding based on scan activity and grace period"""
+        try:
+            scan_metadata = self.get_scan_metadata()
+            
+            # If no pending rebuild needed, skip
+            if not scan_metadata.get('pending_catalog_rebuild', False):
+                return False
+            
+            # Get last scan time
+            last_scan_str = scan_metadata.get('last_scan_time')
+            if not last_scan_str:
+                return False
+                
+            last_scan_time = datetime.fromisoformat(last_scan_str)
+            time_since_last_scan = (datetime.now() - last_scan_time).total_seconds()
+            
+            # If grace period has passed, rebuild is needed
+            needs_rebuild = time_since_last_scan >= self.catalog_rebuild_grace_period
+            
+            if needs_rebuild:
+                print(f"Catalog rebuild needed: {time_since_last_scan:.1f}s since last scan (grace period: {self.catalog_rebuild_grace_period}s)")
+            else:
+                print(f"Catalog rebuild not needed: {time_since_last_scan:.1f}s since last scan (waiting for grace period)")
+            
+            return needs_rebuild
+        except Exception as e:
+            print(f"Error checking catalog rebuild status: {e}")
+            return False
+    
+    def mark_catalog_rebuilt(self):
+        """Mark that catalog has been rebuilt - clears pending rebuild flag"""
+        try:
+            scan_data = self.get_scan_metadata()
+            scan_data['pending_catalog_rebuild'] = False
+            scan_data['last_catalog_rebuild'] = datetime.now().isoformat()
+            self._write_json_file(self.scan_metadata_file, scan_data)
+            print("Catalog rebuild completed - pending flag cleared")
+        except Exception as e:
+            print(f"Error marking catalog as rebuilt: {e}")
     
     def force_refresh_catalog(self):
         """Force refresh catalog by deleting cache (next worker cycle will rebuild)"""

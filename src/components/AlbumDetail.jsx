@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useAppContext } from '../hooks/useAppContext'
+import SpotifyPlayButton from './SpotifyPlayButton'
 import api from '../services/api'
 import '../styles/album-detail.css'
 
@@ -135,14 +136,17 @@ function AlbumDetail() {
               No Cover Art
             </div>
             
-            {/* Star button overlay */}
-            <button
-              onClick={handleAlbumStar}
-              className={`album-star-overlay ${isAlbumStarred ? 'starred' : ''}`}
-              title={isAlbumStarred ? 'Unstar album' : 'Star album'}
-            >
-              <i className={`${isAlbumStarred ? 'fas' : 'far'} fa-star`}></i>
-            </button>
+            {/* Control buttons overlay */}
+            <div className="album-detail-controls">
+              <button
+                onClick={handleAlbumStar}
+                className={`album-star-overlay ${isAlbumStarred ? 'starred' : ''}`}
+                title={isAlbumStarred ? 'Unstar album' : 'Star album'}
+              >
+                <i className={`${isAlbumStarred ? 'fas' : 'far'} fa-star`}></i>
+              </button>
+              <SpotifyPlayButton album={albumData} size="large" />
+            </div>
           </div>
 
           {/* Collapsible Album Metadata */}

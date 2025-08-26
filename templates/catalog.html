@@ -132,7 +132,7 @@
 </div>
 {% else %}
 <div class="alert alert-warning">
-    No albums in catalog yet. <a href="{{ url_for('index') }}">Start scanning barcodes</a> to build your catalog.
+    No albums in catalog yet. <a href="{{ url_for('admin_index') }}">Start scanning barcodes</a> to build your catalog.
 </div>
 {% endif %}
 {% endblock %}
@@ -297,7 +297,7 @@ function renderArtistAlbums(albums) {
     albums.forEach(album => {
         const albumCard = document.createElement('div');
         albumCard.className = 'album-card';
-        albumCard.onclick = () => window.location.href = `/album/${album.Barcode}`;
+        albumCard.onclick = () => window.location.href = `/admin/album/${album.Barcode}`;
         
         const coverPath = `coverart/${album.Barcode}.jpg`;
         const year = album['First Release'] ? 

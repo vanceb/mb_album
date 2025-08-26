@@ -55,7 +55,7 @@ async function processBarcode() {
             controller.abort();
         }, 30000); // 30 second timeout
         
-        const response = await fetch('/scan', {
+        const response = await fetch('/admin/scan', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -107,7 +107,7 @@ async function pollBarcodeStatus(barcode) {
     
     const poll = async () => {
         try {
-            const response = await fetch(`/status/${barcode}`);
+            const response = await fetch(`/admin/status/${barcode}`);
             const data = await response.json();
             
             if (response.ok) {

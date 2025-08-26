@@ -34,7 +34,10 @@ export const DEFAULT_USER_DATA = {
   isAdmin: false,
   starredAlbums: [],
   starredTracks: {},
-  syncId: null
+  syncId: null,
+  // Spotify integration fields
+  spotifyAuth: null,
+  linkedAlbums: {}
 }
 
 // Generate UUID for sync IDs

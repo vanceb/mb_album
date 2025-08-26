@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAppContext } from '../hooks/useAppContext'
+import SpotifyPlayButton from './SpotifyPlayButton'
 import '../styles/catalog.css'
 
 function CatalogView() {
@@ -154,7 +155,10 @@ function CatalogView() {
                 style={{ cursor: 'pointer' }}
               >
                 <td onClick={(e) => e.stopPropagation()}>
-                  {renderStarIcon(album.Barcode)}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {renderStarIcon(album.Barcode)}
+                    <SpotifyPlayButton album={album} size="small" />
+                  </div>
                 </td>
                 <td>
                   <div className="list-view-cover">
@@ -214,8 +218,13 @@ function CatalogView() {
               <div className="no-cover-placeholder" style={{ display: 'none' }}>
                 No Cover Art
               </div>
-              <div className="album-star-overlay" onClick={(e) => e.stopPropagation()}>
-                {renderStarIcon(album.Barcode)}
+              <div className="album-overlay-controls" onClick={(e) => e.stopPropagation()}>
+                <div className="album-star-overlay">
+                  {renderStarIcon(album.Barcode)}
+                </div>
+                <div className="album-spotify-overlay">
+                  <SpotifyPlayButton album={album} size="medium" />
+                </div>
               </div>
             </div>
             <div className="album-info">
@@ -283,8 +292,13 @@ function CatalogView() {
                     <div className="no-cover-placeholder" style={{ display: 'none' }}>
                       No Cover Art
                     </div>
-                    <div className="album-star-overlay" onClick={(e) => e.stopPropagation()}>
-                      {renderStarIcon(album.Barcode)}
+                    <div className="album-overlay-controls" onClick={(e) => e.stopPropagation()}>
+                      <div className="album-star-overlay">
+                        {renderStarIcon(album.Barcode)}
+                      </div>
+                      <div className="album-spotify-overlay">
+                        <SpotifyPlayButton album={album} size="medium" />
+                      </div>
                     </div>
                   </div>
                   <div className="album-info">

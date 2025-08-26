@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useAppContext } from '../hooks/useAppContext'
 import TransferModal from './TransferModal'
 
@@ -17,6 +17,13 @@ function UserSelector() {
   const [newUsername, setNewUsername] = useState('')
   const [showTransferModal, setShowTransferModal] = useState(false)
 
+  // Check for Spotify auth callback and auto-open modal
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    if (urlParams.get('spotify_auth') || urlParams.get('spotify_error')) {
+      setShowTransferModal(true)
+    }
+  }, [])
 
   const toggleDropdown = () => {
     setDropdownOpen(!dropdownOpen)
