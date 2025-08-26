@@ -26,6 +26,7 @@ const initialState = {
   selectedArtist: null,
   starredFilter: false,
   searchTerm: '',
+  sortBy: 'artist-asc', // Default sort by artist A-Z
   
   // UI state
   loading: false,
@@ -106,6 +107,9 @@ function appReducer(state, action) {
       
     case 'SET_SEARCH_TERM':
       return { ...state, searchTerm: action.payload }
+      
+    case 'SET_SORT_BY':
+      return { ...state, sortBy: action.payload }
       
     case 'OPEN_ALBUM_LINKING_MODAL':
       return {
@@ -193,9 +197,11 @@ export function AppProvider({ children }) {
       const viewMode = storage.getViewMode()
       const selectedArtist = storage.getSelectedArtist()
       const starredFilter = storage.getStarredFilter()
+      const sortBy = storage.getItem('mb_album_sort_by', 'artist-asc')
       
       dispatch({ type: 'SET_VIEW_MODE', payload: viewMode })
       dispatch({ type: 'SET_STARRED_FILTER', payload: starredFilter })
+      dispatch({ type: 'SET_SORT_BY', payload: sortBy })
       if (selectedArtist) {
         dispatch({ type: 'SET_SELECTED_ARTIST', payload: selectedArtist })
       }
@@ -409,6 +415,11 @@ export function AppProvider({ children }) {
 
   const setSearchTerm = (term) => {
     dispatch({ type: 'SET_SEARCH_TERM', payload: term })
+  }
+
+  const setSortBy = (sortBy) => {
+    dispatch({ type: 'SET_SORT_BY', payload: sortBy })
+    storage.setItem('mb_album_sort_by', sortBy)
   }
 
   const isAlbumStarred = (barcode) => {
@@ -757,6 +768,7 @@ export function AppProvider({ children }) {
     setSelectedArtist,
     toggleStarredFilter,
     setSearchTerm,
+    setSortBy,
     loadCatalog,
     refreshCatalog,
     isAlbumStarred,

@@ -406,8 +406,8 @@
                 </div>
                 <div class="dropdown-menu">
                     <a href="{{ url_for('admin_index') }}"><i class="fas fa-qrcode"></i> Scan Barcodes</a>
-                    <a href="{{ url_for('queue_status') }}"><i class="fas fa-cogs"></i> Queue Status</a>
-                    <a href="{{ url_for('missing_coverart') }}"><i class="fas fa-image"></i> Missing Cover Art</a>
+                    <a href="/admin/queue"><i class="fas fa-cogs"></i> Queue Status</a>
+                    <a href="/admin/missing-coverart"><i class="fas fa-image"></i> Missing Cover Art</a>
                 </div>
             </div>
         </nav>
@@ -420,34 +420,25 @@
     {% block scripts %}{% endblock %}
     
     <script>
-    // User Management Functions
+    // User Management Functions - Compatible with React app storage
     function loadUsers() {
         try {
-            const storage = localStorage.getItem('albumCatalogData');
-            if (storage) {
-                const data = JSON.parse(storage);
-                return {
-                    users: data.users || [],
-                    currentUser: data.currentUser || null,
-                    userData: data.userData || {}
-                };
-            }
+            return {
+                users: JSON.parse(localStorage.getItem('mb_album_users') || '[]'),
+                currentUser: JSON.parse(localStorage.getItem('mb_album_current_user') || 'null'),
+                userData: JSON.parse(localStorage.getItem('mb_album_user_data') || '{}')
+            };
         } catch (e) {
             console.error('Error loading users:', e);
+            return { users: [], currentUser: null, userData: {} };
         }
-        return { users: [], currentUser: null, userData: {} };
     }
     
     function saveUsers(users, currentUser, userData) {
         try {
-            const existingData = JSON.parse(localStorage.getItem('albumCatalogData') || '{}');
-            const newData = {
-                ...existingData,
-                users,
-                currentUser,
-                userData
-            };
-            localStorage.setItem('albumCatalogData', JSON.stringify(newData));
+            localStorage.setItem('mb_album_users', JSON.stringify(users));
+            localStorage.setItem('mb_album_current_user', JSON.stringify(currentUser));
+            localStorage.setItem('mb_album_user_data', JSON.stringify(userData));
             updateUserDisplay();
             updateAdminDropdownVisibility();
         } catch (e) {
@@ -487,6 +478,14 @@
         closeDropdown('user-dropdown');
     }
     
+    function generateSyncId() {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            const r = Math.random() * 16 | 0;
+            const v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+    
     function addNewUser() {
         const userName = prompt('Enter new user name:');
         if (userName && userName.trim()) {
@@ -501,7 +500,9 @@
                         isAdmin: users.length === 0, // First user is admin
                         starredAlbums: [],
                         starredTracks: {},
-                        syncId: 'uuid-' + trimmedName.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now()
+                        syncId: generateSyncId(),
+                        spotifyAuth: null,
+                        linkedAlbums: {}
                     }
                 };
                 

@@ -28,13 +28,13 @@ function Navbar() {
             <i className="fas fa-chevron-down"></i>
           </div>
           <div className="dropdown-menu">
-            <a href="/" onClick={closeAdminDropdown}>
+            <a href="/admin" onClick={closeAdminDropdown}>
               <i className="fas fa-qrcode"></i> Scan Barcodes
             </a>
-            <a href="/queue_status" onClick={closeAdminDropdown}>
+            <a href="/admin/queue" onClick={closeAdminDropdown}>
               <i className="fas fa-cogs"></i> Queue Status
             </a>
-            <a href="/missing-coverart" onClick={closeAdminDropdown}>
+            <a href="/admin/missing-coverart" onClick={closeAdminDropdown}>
               <i className="fas fa-image"></i> Missing Cover Art
             </a>
           </div>

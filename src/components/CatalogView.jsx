@@ -17,6 +17,7 @@ function CatalogView() {
     viewMode,
     starredFilter,
     selectedArtist,
+    sortBy,
     setViewMode,
     setSelectedArtist,
     toggleAlbumStar,
@@ -48,18 +49,47 @@ function CatalogView() {
       filtered = filtered.filter(album => album.Artist === selectedArtist)
     }
 
-    // Sort by artist, then by first release date
+    // Sort based on sortBy preference
     filtered.sort((a, b) => {
-      const artistCompare = a.Artist.localeCompare(b.Artist)
-      if (artistCompare !== 0) return artistCompare
-      
-      const dateA = a['First Release'] || '9999'
-      const dateB = b['First Release'] || '9999'
-      return dateA.localeCompare(dateB)
+      switch (sortBy) {
+        case 'artist-asc':
+          const artistAscCompare = a.Artist.localeCompare(b.Artist)
+          if (artistAscCompare !== 0) return artistAscCompare
+          // Secondary sort by album name
+          return a['Album/Release'].localeCompare(b['Album/Release'])
+          
+        case 'artist-desc':
+          const artistDescCompare = b.Artist.localeCompare(a.Artist)
+          if (artistDescCompare !== 0) return artistDescCompare
+          // Secondary sort by album name
+          return a['Album/Release'].localeCompare(b['Album/Release'])
+          
+        case 'year-asc':
+          const yearA = parseInt(a['First Release'] || '9999')
+          const yearB = parseInt(b['First Release'] || '9999')
+          const yearCompare = yearA - yearB
+          if (yearCompare !== 0) return yearCompare
+          // Secondary sort by artist
+          return a.Artist.localeCompare(b.Artist)
+          
+        case 'year-desc':
+          const yearDescA = parseInt(a['First Release'] || '0')
+          const yearDescB = parseInt(b['First Release'] || '0')
+          const yearDescCompare = yearDescB - yearDescA
+          if (yearDescCompare !== 0) return yearDescCompare
+          // Secondary sort by artist
+          return a.Artist.localeCompare(b.Artist)
+          
+        default:
+          // Default to artist A-Z
+          const defaultCompare = a.Artist.localeCompare(b.Artist)
+          if (defaultCompare !== 0) return defaultCompare
+          return a['Album/Release'].localeCompare(b['Album/Release'])
+      }
     })
 
     return filtered
-  }, [catalog, searchTerm, starredFilter, selectedArtist, viewMode, starredAlbums])
+  }, [catalog, searchTerm, starredFilter, selectedArtist, viewMode, starredAlbums, sortBy])
 
   // Get artists with album counts for artist view
   const artistsData = useMemo(() => {

@@ -1,4 +1,4 @@
-from flask import Flask, render_template, render_template_string, request, jsonify, redirect, url_for
+from flask import Flask, render_template, render_template_string, request, jsonify, redirect, url_for, abort
 import csv
 import os
 import json
@@ -765,10 +765,22 @@ def api_refresh_catalog():
 # REACT SPA SERVING
 # ============================================================================
 
+# React SPA routes - only handle specific frontend paths
 @app.route('/')
-@app.route('/<path:path>')
-def react_app(path=''):
+def react_app_root():
     """Serve the React SPA at root"""
+    return serve_react_app('')
+
+# Only serve React for specific frontend routes, not catch-all
+@app.route('/album/<path:path>')
+@app.route('/user/<path:path>')  
+@app.route('/catalog')
+@app.route('/catalog/<path:path>')
+def react_app_routes(path=''):
+    """Serve the React SPA for specific frontend routes"""
+    return serve_react_app(path)
+
+def serve_react_app(path):
     try:
         # Check if built files exist
         bundle_js = os.path.join('static', 'dist', 'bundle.js')

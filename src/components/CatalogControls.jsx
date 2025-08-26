@@ -15,10 +15,12 @@ function CatalogControls() {
     viewMode,
     starredFilter,
     selectedArtist,
+    sortBy,
     setSearchTerm,
     setViewMode,
     toggleStarredFilter,
     setSelectedArtist,
+    setSortBy,
     refreshCatalog
   } = useAppContext()
   
@@ -116,6 +118,38 @@ function CatalogControls() {
             title="Starred Tracks"
           >
             <i className="fas fa-music"></i>
+          </button>
+        </div>
+
+        {/* Sorting controls */}
+        <div className="sort-controls">
+          <button
+            onClick={() => setSortBy('artist-asc')}
+            className={`sort-btn ${sortBy === 'artist-asc' ? 'active' : ''}`}
+            title="Sort by Artist A-Z"
+          >
+            <i className="fas fa-sort-alpha-down"></i> Artist
+          </button>
+          <button
+            onClick={() => setSortBy('artist-desc')}
+            className={`sort-btn ${sortBy === 'artist-desc' ? 'active' : ''}`}
+            title="Sort by Artist Z-A"
+          >
+            <i className="fas fa-sort-alpha-up"></i> Artist
+          </button>
+          <button
+            onClick={() => setSortBy('year-asc')}
+            className={`sort-btn ${sortBy === 'year-asc' ? 'active' : ''}`}
+            title="Sort by Year (Oldest First)"
+          >
+            <i className="fas fa-sort-numeric-down"></i> Year
+          </button>
+          <button
+            onClick={() => setSortBy('year-desc')}
+            className={`sort-btn ${sortBy === 'year-desc' ? 'active' : ''}`}
+            title="Sort by Year (Newest First)"
+          >
+            <i className="fas fa-sort-numeric-up"></i> Year
           </button>
         </div>
 
