@@ -89,18 +89,35 @@ function SpotifyPlayerBar() {
 
     setLoading(true)
     try {
-      // Use Web Playback SDK for play/pause
-      await spotifyWebPlayback.togglePlay()
-      
-      // If no active playback, transfer playback to this device first
-      if (!spotify.playbackState || spotify.playbackState.device.id !== spotifyWebPlayback.getDeviceId()) {
-        const validUserData = await ensureValidSpotifyAuth()
-        if (validUserData) {
-          await spotifyWebPlayback.transferPlaybackToThisDevice(
-            validUserData.spotifyAuth.access_token, 
-            true
-          )
+      const validUserData = await ensureValidSpotifyAuth()
+      if (!validUserData) {
+        console.error('No valid Spotify auth for playback control')
+        return
+      }
+
+      const webPlaybackDeviceId = spotifyWebPlayback.getDeviceId()
+      const currentDeviceId = spotify.playbackState?.device?.id
+      const isPlayingOnWebPlayback = currentDeviceId === webPlaybackDeviceId
+
+      if (isPlayingOnWebPlayback) {
+        // Use Web Playback SDK when playing on this device
+        await spotifyWebPlayback.togglePlay()
+      } else {
+        // Use Web API when playing on external devices (Echo, phone, etc.)
+        const endpoint = spotify.playbackState?.is_playing ? 'pause' : 'play'
+        const response = await fetch(`https://api.spotify.com/v1/me/player/${endpoint}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${validUserData.spotifyAuth.access_token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+        
+        if (!response.ok && response.status !== 204) {
+          throw new Error(`Failed to ${endpoint} playback: ${response.status}`)
         }
+        
+        console.log(`Successfully ${endpoint === 'play' ? 'resumed' : 'paused'} playback on external device`)
       }
     } catch (error) {
       console.error('Play/pause error:', error)
@@ -154,9 +171,34 @@ function SpotifyPlayerBar() {
 
     setLoading(true)
     try {
-      // Use Web Playback SDK for seeking
-      await spotifyWebPlayback.seek(seekPosition)
-      // State will update automatically via SDK events
+      const validUserData = await ensureValidSpotifyAuth()
+      if (!validUserData) {
+        console.error('No valid Spotify auth for seek')
+        return
+      }
+
+      const webPlaybackDeviceId = spotifyWebPlayback.getDeviceId()
+      const currentDeviceId = spotify.playbackState?.device?.id
+      const isPlayingOnWebPlayback = currentDeviceId === webPlaybackDeviceId
+
+      if (isPlayingOnWebPlayback) {
+        // Use Web Playback SDK when playing on this device
+        await spotifyWebPlayback.seek(seekPosition)
+      } else {
+        // Use Web API when playing on external devices
+        const response = await fetch(`https://api.spotify.com/v1/me/player/seek?position_ms=${seekPosition}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${validUserData.spotifyAuth.access_token}`
+          }
+        })
+        
+        if (!response.ok && response.status !== 204) {
+          throw new Error(`Failed to seek to position: ${response.status}`)
+        }
+        
+        console.log(`Successfully seeked to ${Math.floor(seekPosition / 1000)}s on external device`)
+      }
     } catch (error) {
       console.error('Seek error:', error)
     } finally {
@@ -168,9 +210,34 @@ function SpotifyPlayerBar() {
     if (loading) return
     setLoading(true)
     try {
-      // Use Web Playback SDK for next track
-      await spotifyWebPlayback.nextTrack()
-      // State will update automatically via SDK events
+      const validUserData = await ensureValidSpotifyAuth()
+      if (!validUserData) {
+        console.error('No valid Spotify auth for next track')
+        return
+      }
+
+      const webPlaybackDeviceId = spotifyWebPlayback.getDeviceId()
+      const currentDeviceId = spotify.playbackState?.device?.id
+      const isPlayingOnWebPlayback = currentDeviceId === webPlaybackDeviceId
+
+      if (isPlayingOnWebPlayback) {
+        // Use Web Playback SDK when playing on this device
+        await spotifyWebPlayback.nextTrack()
+      } else {
+        // Use Web API when playing on external devices
+        const response = await fetch('https://api.spotify.com/v1/me/player/next', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${validUserData.spotifyAuth.access_token}`
+          }
+        })
+        
+        if (!response.ok && response.status !== 204) {
+          throw new Error(`Failed to skip to next track: ${response.status}`)
+        }
+        
+        console.log('Successfully skipped to next track on external device')
+      }
     } catch (error) {
       console.error('Next track error:', error)
     } finally {
@@ -182,9 +249,34 @@ function SpotifyPlayerBar() {
     if (loading) return
     setLoading(true)
     try {
-      // Use Web Playback SDK for previous track
-      await spotifyWebPlayback.previousTrack()
-      // State will update automatically via SDK events
+      const validUserData = await ensureValidSpotifyAuth()
+      if (!validUserData) {
+        console.error('No valid Spotify auth for previous track')
+        return
+      }
+
+      const webPlaybackDeviceId = spotifyWebPlayback.getDeviceId()
+      const currentDeviceId = spotify.playbackState?.device?.id
+      const isPlayingOnWebPlayback = currentDeviceId === webPlaybackDeviceId
+
+      if (isPlayingOnWebPlayback) {
+        // Use Web Playback SDK when playing on this device
+        await spotifyWebPlayback.previousTrack()
+      } else {
+        // Use Web API when playing on external devices
+        const response = await fetch('https://api.spotify.com/v1/me/player/previous', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${validUserData.spotifyAuth.access_token}`
+          }
+        })
+        
+        if (!response.ok && response.status !== 204) {
+          throw new Error(`Failed to skip to previous track: ${response.status}`)
+        }
+        
+        console.log('Successfully skipped to previous track on external device')
+      }
     } catch (error) {
       console.error('Previous track error:', error)
     } finally {
