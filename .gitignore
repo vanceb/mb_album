@@ -4,6 +4,9 @@ venv
 __pycache__
 .cache
 
+# Environment variables (contains secrets)
+.env
+
 *secret.py
 spotify_token.json
 
